@@ -18,10 +18,46 @@ const demoProducts=[
 {id:"local-p6",sku:"BRG-006",nama:"Air Mineral 600 ml",kategori:"Minuman",satuan:"botol",harga_beli:2500,harga_jual:3500,stok:48,stok_minimum:12,aktif:true}
 ];
 let products=demoProducts.map(x=>({...x})), customers=[{id:"local-c1",nama:"Pelanggan Grosir",telepon:"081234567890",alamat:"Pelanggan contoh"}];
-let sales=[],saleItems=[],purchases=[],expenses=[],cart=[],localMode=true,toastTimer;
+let sales=[],saleItems=[],purchases=[],expenses=[],cart=[],localMode=true,demoSampleData=false,toastTimer;
 const localKey="retailpro_demo_data";
-function loadLocal(){try{const d=JSON.parse(localStorage.getItem(localKey)||"null");if(d){products=d.products||products;customers=d.customers||customers;sales=d.sales||[];purchases=d.purchases||[];expenses=d.expenses||[];}}catch(e){console.warn("Data demo lokal tidak dapat dibaca:",e)}}
-function saveLocal(){localStorage.setItem(localKey,JSON.stringify({products,customers,sales,purchases,expenses}));}
+function saveLocal(){localStorage.setItem(localKey,JSON.stringify({products,customers,sales,purchases,expenses,demoSampleData}));}
+function seedDemoData(){
+ const dateAt=(daysAgo,hour=11)=>{const d=new Date();d.setDate(d.getDate()-daysAgo);d.setHours(hour,0,0,0);return d.toISOString()};
+ products=demoProducts.map(p=>({...p}));
+ customers=[
+  {id:"local-c1",nama:"Pelanggan Grosir",telepon:"081234567890",alamat:"Pelanggan contoh"},
+  {id:"local-c2",nama:"Warung Berkah",telepon:"081298765432",alamat:"Pelanggan contoh"}
+ ];
+ purchases=[
+  {id:"demo-purchase-1",barang_id:"local-p1",tanggal:dateAt(5,9),jumlah:6,harga_satuan:65000,total:390000,catatan:"Stok demo awal bulan"},
+  {id:"demo-purchase-2",barang_id:"local-p2",tanggal:dateAt(2,10),jumlah:20,harga_satuan:15500,total:310000,catatan:"Pengadaan minyak goreng"},
+  {id:"demo-purchase-3",barang_id:"local-p6",tanggal:dateAt(1,9),jumlah:24,harga_satuan:2500,total:60000,catatan:"Pengadaan air mineral"}
+ ];
+ const saleSpecs=[
+  {days:6,customer:"local-c1",method:"transfer",discount:6500,items:[["local-p5",2],["local-p1",2],["local-p4",5]]},
+  {days:5,customer:"local-c2",method:"qris",discount:5000,items:[["local-p2",4],["local-p3",3],["local-p4",12]]},
+  {days:4,customer:"local-c1",method:"cash",discount:11000,items:[["local-p1",3],["local-p6",10]]},
+  {days:3,customer:"local-c2",method:"cash",discount:2500,items:[["local-p5",3],["local-p3",2],["local-p4",6]]},
+  {days:2,customer:"local-c1",method:"qris",discount:0,items:[["local-p1",1],["local-p2",2],["local-p6",12]]},
+  {days:1,customer:"local-c2",method:"transfer",discount:0,items:[["local-p3",4],["local-p4",10]]},
+  {days:0,customer:"local-c1",method:"cash",discount:6000,items:[["local-p1",2],["local-p2",3],["local-p4",8]]}
+ ];
+ sales=saleSpecs.map((spec,index)=>{
+  const items=spec.items.map(([id,qty])=>{const p=products.find(x=>x.id===id);return{id,qty,price:p.harga_jual,cost:p.harga_beli}});
+  const subtotal=items.reduce((sum,item)=>sum+item.qty*item.price,0);
+  return{id:`demo-sale-${index+1}`,nomor_nota:`DEMO-${dateAt(spec.days).slice(0,10).replaceAll("-","")}-${String(index+1).padStart(3,"0")}`,tanggal:dateAt(spec.days,10+index),pelanggan_id:spec.customer,subtotal,diskon:spec.discount,total:subtotal-spec.discount,metode_pembayaran:spec.method,jumlah_dibayar:subtotal-spec.discount,kembalian:0,status:"selesai",items};
+ });
+ expenses=[
+  {id:"demo-expense-1",tanggal:dateAt(6,8),kategori:"Listrik & air",keterangan:"Tagihan utilitas toko (data demo)",nominal:35000},
+  {id:"demo-expense-2",tanggal:dateAt(3,8),kategori:"Perlengkapan toko",keterangan:"Kantong dan kemasan (data demo)",nominal:25000},
+  {id:"demo-expense-3",tanggal:dateAt(1,8),kategori:"Transportasi",keterangan:"Biaya pengiriman stok (data demo)",nominal:30000}
+ ];
+ for(const purchase of purchases){const p=products.find(x=>x.id===purchase.barang_id);p.stok+=purchase.jumlah;}
+ for(const sale of sales)for(const item of sale.items){const p=products.find(x=>x.id===item.id);p.stok-=item.qty;}
+ demoSampleData=true;
+ saveLocal();
+}
+function loadLocal(){try{const d=JSON.parse(localStorage.getItem(localKey)||"null");if(d){products=d.products||products;customers=d.customers||customers;sales=d.sales||[];purchases=d.purchases||[];expenses=d.expenses||[];demoSampleData=Boolean(d.demoSampleData);}else if(!window.RetailConfig.isConnected())seedDemoData();}catch(e){console.warn("Data demo lokal tidak dapat dibaca:",e)}}
 function toast(msg,error=false){const e=$("#toast");e.textContent=msg;e.className="toast show"+(error?" error":"");clearTimeout(toastTimer);toastTimer=setTimeout(()=>e.className="toast",3500)}
 function empty(title,desc){return `<div class="empty"><i class="fa-solid fa-box-open"></i><b>${title}</b><p>${desc}</p></div>`}
 function statusConnection(problem=""){localMode=!window.RetailConfig.isConnected();const status=$("#connectionStatus");if(localMode){status.textContent="Mode demo lokal";status.style.color="#9a8da5";return}if(problem){const schemaIssue=/table .*schema cache|relation .* does not exist|schema cache/i.test(problem);status.textContent=schemaIssue?"Skema database perlu diperbarui":"Koneksi database bermasalah";status.style.color="#c47b20";return}status.textContent="Terhubung ke Supabase";status.style.color="#15803d";}
@@ -76,6 +112,7 @@ function saleCost(s){
 function reportTable(rows,headers,renderRow,emptyTitle,emptyDescription){return rows.length?`<table class="data-table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map(renderRow).join("")}</tbody></table>`:empty(emptyTitle,emptyDescription)}
 function renderSalesReport(){
  const rows=reportRows(),valid=rows.filter(s=>s.status!=="dibatalkan"),purchasesInPeriod=reportPurchases(),expensesInPeriod=reportExpenses();
+ $("#demoDataNotice").classList.toggle("hidden",!(localMode&&demoSampleData));
  const revenue=valid.reduce((sum,s)=>sum+Number(s.total||0),0),cogs=valid.reduce((sum,s)=>sum+saleCost(s),0),gross=revenue-cogs,expenseTotal=expensesInPeriod.reduce((sum,x)=>sum+Number(x.nominal||0),0),purchaseTotal=purchasesInPeriod.reduce((sum,p)=>sum+Number(p.total||Number(p.jumlah||0)*Number(p.harga_satuan||0)),0),net=gross-expenseTotal;
  $("#reportCount").textContent=valid.length;$("#reportRevenue").textContent=money(revenue);$("#reportCost").textContent=money(cogs);$("#reportGrossProfit").textContent=money(gross);$("#reportExpenses").textContent=money(expenseTotal);$("#reportNetProfit").textContent=money(net);$("#reportPurchases").textContent=money(purchaseTotal);$("#reportCashflow").textContent=money(revenue-purchaseTotal-expenseTotal);$("#reportDiscount").textContent=money(valid.reduce((sum,s)=>sum+Number(s.diskon||0),0));
  $("#incomeStatement").innerHTML=reportTable([

@@ -31,7 +31,7 @@ Demo yang di-host di GitHub Pages berjalan sebagai aplikasi web statis. Secara d
 - **Laporan keuangan:** menyaring periode dan melihat penjualan, HPP, laba kotor, beban operasional, laba bersih, pembelian stok, arus kas, transaksi, dan metode pembayaran.
 - **Ekspor:** mengunduh data persediaan dan pelanggan serta laporan sebagai CSV atau Excel (`.xlsx`).
 - **Pembatalan transaksi:** membatalkan transaksi dan memulihkan stok sesuai pencatatan aplikasi.
-- **Mode demo:** mencoba fitur tanpa menghubungkan database; data demo tersimpan di browser yang digunakan.
+- **Mode demo:** mencoba fitur tanpa menghubungkan database; data demo tersimpan di browser yang digunakan. Pada browser baru, aplikasi mengisi data contoh penjualan, pembelian stok, dan beban operasional agar laporan dapat dilihat langsung.
 
 ## Logika Akuntansi
 
@@ -131,6 +131,7 @@ GitHub Pages menerbitkan isi folder `frontend` melalui GitHub Actions. Setelah w
 ## Catatan Penting
 
 - Mode demo menyimpan data secara lokal di browser/perangkat yang digunakan; data tersebut tidak dibagikan ke pengguna atau browser lain.
+- Data dummy hanya untuk demonstrasi, bukan transaksi nyata. Data itu dibuat sekali saat mode demo pertama kali dibuka pada browser baru; data demo yang sudah ada tidak ditimpa.
 - Supabase belum otomatis terhubung hanya dengan membuka demo. Database memerlukan konfigurasi proyek dan seluruh skrip SQL berhasil dijalankan.
 - Jangan menaruh `service_role` key, kata sandi, atau rahasia lain di frontend maupun repositori. Gunakan hanya publishable/anon key di browser.
 - Kebijakan SQL untuk demo/pengembangan dapat memberikan akses publik. Sebelum digunakan untuk data nyata, terapkan autentikasi dan RLS berbasis pengguna/role, lalu tinjau hak akses.
