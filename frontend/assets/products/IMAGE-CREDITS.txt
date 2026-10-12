@@ -1,0 +1,11 @@
+flour.jpg
+Author: Brigade Piron
+Source: https://commons.wikimedia.org/wiki/File:CRB_flour_bag.jpg
+License: Creative Commons Attribution 3.0 (CC BY 3.0)
+License URL: https://creativecommons.org/licenses/by/3.0/
+
+sugar.jpg
+Author: Tobias Erbsland
+Source: https://commons.wikimedia.org/wiki/File:Granulated_White_Sugar_with_Large_Crystals,_Bright_Front_Light.jpg
+License: Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0)
+License URL: https://creativecommons.org/licenses/by-sa/4.0/

@@ -133,14 +133,18 @@ body {
 .total-row { border-color: #dce9f5; }
 .pill { background: #e0f2fe; color: #075985; border-color: #bae6fd; }
 .welcome-banner {
-  background: linear-gradient(120deg, rgba(14,165,233,.14), rgba(37,99,235,.12), rgba(255,255,255,.92));
+  background: linear-gradient(120deg, #103b72 0%, #075985 58%, #0e7490 100%);
   border-color: rgba(125, 180, 225, .28);
   box-shadow: 0 16px 36px rgba(37, 99, 235, .09);
 }
-.welcome-tag { background: rgba(255,255,255,.78); color: #075985; border-color: #c7e8fb; }
-.welcome-copy h2 { color: #102f58; }
+.welcome-copy { color: #fff; }
+.welcome-tag { background: rgba(255,255,255,.12); color: #e0f2fe; border-color: rgba(186,230,253,.32); }
+.welcome-tag i { color: #7dd3fc; }
+.welcome-copy h2 { color: #fff; }
+.welcome-copy h2 strong { color: #7dd3fc; }
+.welcome-copy p { color: #d7eaff; }
 .welcome-image { background: linear-gradient(135deg, #bae6fd, #bfdbfe); }
-.welcome-image:before { background: linear-gradient(0deg, #0b367866, transparent 70%); }
+.welcome-image:before { background: linear-gradient(90deg, rgba(9,58,105,.25), transparent 48%), linear-gradient(0deg, rgba(9,58,105,.25), transparent 58%); }
 .modal {
   border-color: #d7e6f3;
   box-shadow: 0 24px 80px rgba(20, 55, 95, .2);
@@ -160,14 +164,22 @@ body {
 .empty { color: #71869a; }
 .empty i { color: #60a5fa; }
 .demo-data-notice { border-color: #f1d18b; }
-.product-photo > .product-art { display: block; width: 100%; height: 100%; padding: 10px; }
-.product-art { color: #dbeafe; }
-.product-art--water { color: #bfe9ff; }
-.product-art--noodles { color: #ffe5b5; }
-.product-art--rice { color: #f3e4c1; }
-.product-art--oil { color: #fff0b8; }
-.product-art--sugar, .product-art--flour, .product-art--other { color: #e3f0fb; }
-.product-art--drink { color: #d6f5e3; }
+.product-photo > .product-image { display: block; width: 100%; height: 100%; }
+.product-image { object-fit: cover; }
+.product-image--water, .product-image--noodles, .product-image--milk { object-fit: contain; background: #fff; }
+.product-image--water { object-fit: cover; }
+.photo-unavailable {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 60px;
+  place-items: center;
+  padding: 10px;
+  background: #f1f7fd;
+  color: #647b92;
+  font-size: 10px;
+  text-align: center;
+}
 .welcome-product-display {
   position: absolute;
   inset: 0;
@@ -175,18 +187,22 @@ body {
   align-items: center;
   justify-content: center;
   gap: clamp(2px, 2vw, 18px);
-  padding: 18px 12px 32px;
-  background: radial-gradient(ellipse at 50% 75%, rgba(255,255,255,.68), transparent 65%);
+  padding: 20px 18px 36px;
+  background: radial-gradient(ellipse at 50% 75%, rgba(255,255,255,.8), transparent 65%);
 }
 .welcome-product {
-  width: min(31%, 150px);
-  height: 76%;
+  width: min(31%, 170px);
+  height: 82%;
   display: grid;
-  align-items: end;
-  filter: drop-shadow(0 14px 14px rgba(12, 48, 83, .16));
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(212, 230, 246, .78);
+  border-radius: 15px;
+  background: rgba(255,255,255,.95);
+  box-shadow: 0 12px 28px rgba(12, 48, 83, .13);
 }
 .welcome-product:nth-child(2) { height: 94%; }
-.welcome-product .product-art { width: 100%; height: 100%; overflow: visible; }
+.welcome-product .product-image { position: static; inset: auto; width: 100%; height: 100%; object-fit: contain; }
 .welcome-image:before {
   background: linear-gradient(90deg, rgba(14, 74, 130, .24), transparent 65%), linear-gradient(0deg, rgba(14, 74, 130, .25), transparent 62%);
 }
