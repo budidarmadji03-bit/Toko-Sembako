@@ -1,19 +1,51 @@
+## [Buka Demo Aplikasi Toko Sembako](https://budidarmadji03-bit.github.io/Toko-Sembako/)
+
 # Toko Sembako
 
-Sistem informasi penjualan, persediaan, pelanggan, dan laporan keuangan toko sembako. Aplikasi menggunakan HTML, CSS, JavaScript, dan Supabase JS v2; tidak memerlukan npm atau proses build.
+**Nama:** Budi Austiano Darmadji
+
+**NIM:** 12030124140215
+
+**Mata Kuliah:** Pengkodean dan Pemograman
+
+**Kelas:** E
+
+**Dosen Pengampu:** Dr. Totok Dewayanto, S.E., M.Si., Akt.
+
+*Disusun untuk memenuhi Tugas Project UTS Pengkodean dan Pemograman.*
+
+---
+
+## Penjelasan Sistem
+
+Toko Sembako adalah aplikasi sistem informasi untuk membantu kegiatan operasional toko, mulai dari pengelolaan barang dan persediaan, transaksi penjualan, pencatatan pelanggan, hingga pemantauan ringkasan keuangan. Aplikasi menyediakan dashboard untuk melihat aktivitas toko dan peringatan stok.
+
+Demo yang di-host di GitHub Pages berjalan sebagai aplikasi web statis. Secara default, data demo disimpan di penyimpanan browser dan tidak otomatis tersinkron dengan database. Supabase dapat dikonfigurasikan secara terpisah untuk penyimpanan online setelah skema database disiapkan.
 
 ## Fitur
 
-- Dashboard penjualan harian, grafik 7 hari, nilai stok, dan peringatan stok minimum.
-- Persediaan: pencarian, filter, tambah/edit/nonaktifkan barang, stok masuk, dan ekspor CSV.
-- Kasir: keranjang, pelanggan, diskon, metode pembayaran, validasi pembayaran, dan kembalian.
-- Pelanggan: tambah, edit, cari, hapus, dan ekspor CSV.
-- Ekspor data persediaan dan pelanggan ke CSV maupun workbook Excel `.xlsx`; laporan keuangan tersedia sebagai CSV dan workbook lima sheet.
-- Laporan keuangan dengan filter periode: penjualan bersih, diskon, harga pokok penjualan (HPP), laba kotor, beban operasional, laba bersih, pembelian persediaan, arus kas bersih, ringkasan laba rugi, rincian pembayaran, transaksi, pembelian, serta beban.
-- Ekspor laporan keuangan gabungan ke CSV dan pembatalan transaksi dengan pemulihan stok.
-- Mode demo menyimpan data pada browser. Data demo tidak disinkronkan ke Supabase.
+- **Dashboard:** ringkasan penjualan harian, grafik penjualan tujuh hari, jumlah barang, nilai persediaan, dan peringatan stok minimum.
+- **Persediaan:** melihat, mencari, dan menyaring barang; menambah, mengubah, atau menonaktifkan barang; serta mencatat stok masuk.
+- **Kasir:** membuat keranjang penjualan, memilih pelanggan, menerapkan diskon, memilih metode pembayaran, dan memvalidasi pembayaran serta kembalian.
+- **Pelanggan:** melihat, mencari, menambah, mengubah, dan menghapus data pelanggan.
+- **Laporan keuangan:** menyaring periode dan melihat penjualan, HPP, laba kotor, beban operasional, laba bersih, pembelian stok, arus kas, transaksi, dan metode pembayaran.
+- **Ekspor:** mengunduh data persediaan dan pelanggan serta laporan sebagai CSV atau Excel (`.xlsx`).
+- **Pembatalan transaksi:** membatalkan transaksi dan memulihkan stok sesuai pencatatan aplikasi.
+- **Mode demo:** mencoba fitur tanpa menghubungkan database; data demo tersimpan di browser yang digunakan.
 
-## ERD inti (3 entitas)
+## Logika Akuntansi
+
+- **Penjualan bersih** dihitung dari total transaksi selesai. Transaksi yang dibatalkan tidak dihitung sebagai penjualan.
+- **HPP (Harga Pokok Penjualan)** dijumlahkan berdasarkan harga pokok barang pada detail transaksi. Untuk transaksi lama tanpa snapshot HPP, mode lokal dapat memperkirakan HPP menggunakan harga beli barang saat ini.
+- **Laba kotor** = penjualan bersih − HPP.
+- **Laba bersih** = laba kotor − beban operasional yang dicatat.
+- **Pembelian stok** dilaporkan sebagai arus kas keluar untuk persediaan, bukan langsung sebagai beban laba rugi.
+- **Arus kas bersih sederhana** = penerimaan penjualan − pembelian stok − beban operasional.
+- Diskon ditampilkan terpisah dari ringkasan penjualan. Catat beban operasional agar perhitungan laba bersih mencerminkan biaya yang dimasukkan.
+
+Perhitungan ini merupakan ringkasan operasional sederhana, bukan pengganti pembukuan resmi, pelaporan pajak, atau laporan akuntansi yang telah ditelaah profesional.
+
+## ERD Inti (3 Entitas)
 
 ```mermaid
 erDiagram
@@ -49,30 +81,58 @@ erDiagram
     }
 ```
 
-`DETAIL_PENJUALAN` adalah entitas penghubung/baris transaksi: satu penjualan memiliki satu atau lebih detail, dan satu barang dapat muncul di banyak detail. Tabel `PELANGGAN`, `MUTASI_PERSEDIAAN`, `PEMBELIAN_STOK`, dan `BEBAN_OPERASIONAL` mendukung fitur aplikasi, tetapi tidak ditampilkan dalam ERD inti tiga entitas di atas.
+`DETAIL_PENJUALAN` menyimpan baris barang dalam nota dan menghubungkan `PENJUALAN` dengan `BARANG`. Satu penjualan memiliki satu atau lebih detail; satu barang dapat muncul di banyak detail. Entitas lain seperti pelanggan, mutasi persediaan, pembelian stok, dan beban operasional mendukung fitur aplikasi, tetapi tidak ditampilkan dalam ERD inti ini.
 
-## Menjalankan
+## Struktur Folder
 
-1. Buka folder proyek di VS Code.
-2. Untuk database online, buat proyek Supabase dan buka SQL Editor.
-3. Jalankan `backend/sql/01_schema.sql`, lalu `backend/sql/02_rpc.sql`; jalankan `backend/sql/03_seed.sql` bila ingin memuat contoh barang.
-4. Jika proyek Supabase sudah pernah disiapkan, jalankan kembali kedua skrip schema dan RPC tersebut agar tabel laporan keuangan dan fungsi pencatatan stok masuk terbaru tersedia. Pastikan semua perintah berhasil tanpa error di SQL Editor.
-5. Buka `frontend/html/index.html` dengan Live Server. Tanpa Supabase, aplikasi otomatis menggunakan mode demo.
-6. Untuk Supabase, buka **Pengaturan Supabase** di aplikasi dan masukkan Project URL serta publishable/anon key.
+```text
+.
+├── .github/
+│   └── workflows/
+│       └── deploy-pages.yml   # Publikasi demo ke GitHub Pages
+├── backend/
+│   └── sql/
+│       ├── 01_schema.sql      # Tabel, relasi, indeks, dan kebijakan database
+│       ├── 02_rpc.sql         # Fungsi transaksi dan perubahan stok
+│       └── 03_seed.sql        # Data awal/contoh barang
+├── frontend/
+│   ├── index.html             # Pengarah ke halaman aplikasi
+│   ├── css/
+│   │   └── style.css          # Tampilan dan tata letak responsif
+│   ├── html/
+│   │   ├── index.html         # Halaman utama aplikasi
+│   │   └── login.html         # Halaman login opsional Supabase Auth
+│   └── js/
+│       ├── app.js             # Navigasi, kasir, persediaan, laporan, ekspor
+│       └── config.js          # Konfigurasi klien Supabase di browser
+└── README.md
+```
 
-Ekspor Excel menggunakan SheetJS Community Edition dari CDN resminya; perangkat perlu terhubung ke internet saat halaman dibuka. Tombol ekspor CSV tetap tersedia.
+## Teknologi
 
-## Dasar perhitungan laporan
+- HTML5, CSS3, dan JavaScript tanpa framework/build step.
+- Supabase JS v2 untuk integrasi database dan autentikasi opsional.
+- PostgreSQL dan PL/pgSQL untuk skema serta fungsi RPC Supabase.
+- SheetJS Community Edition untuk membuat file Excel `.xlsx`.
+- GitHub Pages dan GitHub Actions untuk menerbitkan demo statis.
+- Font Awesome, Google Fonts, dan Unsplash untuk ikon, tipografi, serta gambar.
 
-- Penjualan bersih adalah total nota berstatus selesai; nota yang dibatalkan tidak masuk laba dan diskon ditampilkan terpisah.
-- HPP dijumlahkan dari harga pokok yang disimpan pada setiap detail saat barang terjual. Untuk data transaksi lama tanpa detail/snapshot HPP, mode lokal memperkirakan memakai harga beli barang saat ini.
-- Laba kotor = penjualan bersih − HPP. Laba bersih = laba kotor − beban operasional yang dicatat.
-- Pembelian persediaan dilaporkan sebagai pengeluaran kas, bukan langsung sebagai beban laba rugi. Arus kas bersih sederhana = penerimaan penjualan − pembelian persediaan − beban operasional.
-- Laporan ini adalah ringkasan operasional sederhana, bukan pengganti pembukuan pajak atau laporan akuntansi formal. Pengeluaran harus dicatat agar laba bersih mencerminkan biaya toko.
+## Menjalankan Secara Lokal
 
-## Keamanan dan batasan
+1. Clone repositori dan buka folder proyek di VS Code.
+2. Sajikan folder `frontend` dengan server statis, misalnya ekstensi Live Server.
+3. Buka `html/index.html` pada server tersebut. Demo dapat digunakan tanpa konfigurasi Supabase; datanya disimpan di browser.
+4. Untuk menggunakan database online, buat proyek Supabase dan buka SQL Editor.
+5. Jalankan `backend/sql/01_schema.sql`, lalu `backend/sql/02_rpc.sql`. Jalankan `backend/sql/03_seed.sql` jika ingin memasukkan contoh barang.
+6. Pastikan semua skrip sukses dijalankan. Pada aplikasi, buka **Pengaturan Supabase** dan masukkan Project URL serta publishable/anon key.
 
-- Gunakan hanya publishable/anon key di browser; jangan pernah menggunakan `service_role`.
-- SQL menyediakan policy akses publik untuk demo/pengembangan. Sebelum penggunaan produksi, ganti policy RLS dengan kebijakan berbasis pengguna/role, aktifkan autentikasi, dan lakukan audit keamanan.
-- Penjualan, pembatalan, dan stok masuk memakai RPC database agar perubahan stok serta pencatatan terkait berjalan atomik.
-- Tinjau metode HPP, pajak, hak akses, audit trail, backup, dan prosedur pembatalan bersama pengelola/akuntan sebelum menjadikan aplikasi sebagai pembukuan resmi.
+GitHub Pages menerbitkan isi folder `frontend` melalui GitHub Actions. Setelah workflow deployment berhasil, gunakan tautan demo di bagian paling atas README ini.
+
+## Catatan Penting
+
+- Mode demo menyimpan data secara lokal di browser/perangkat yang digunakan; data tersebut tidak dibagikan ke pengguna atau browser lain.
+- Supabase belum otomatis terhubung hanya dengan membuka demo. Database memerlukan konfigurasi proyek dan seluruh skrip SQL berhasil dijalankan.
+- Jangan menaruh `service_role` key, kata sandi, atau rahasia lain di frontend maupun repositori. Gunakan hanya publishable/anon key di browser.
+- Kebijakan SQL untuk demo/pengembangan dapat memberikan akses publik. Sebelum digunakan untuk data nyata, terapkan autentikasi dan RLS berbasis pengguna/role, lalu tinjau hak akses.
+- SheetJS, Supabase JS, ikon, font, dan gambar eksternal memerlukan koneksi internet. Ekspor CSV tetap disediakan sebagai alternatif Excel.
+- Tinjau metode HPP, pajak, audit trail, pencadangan, dan prosedur pembatalan sebelum menggunakan aplikasi sebagai sistem pembukuan resmi.
