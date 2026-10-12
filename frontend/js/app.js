@@ -3,12 +3,43 @@
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const money=n=>new Intl.NumberFormat("id-ID",{style:"currency",currency:"IDR",maximumFractionDigits:0}).format(Number(n)||0);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-function productPhoto(product,size=240){
- const name=`${product.nama||""} ${product.kategori||""}`.toLowerCase();
- const id=/beras|serealia/.test(name)?"photo-1586201375761-83865001e31c":/minyak|bumbu/.test(name)?"photo-1474979266404-7eaacbcd87c5":/gula|tepung/.test(name)?"photo-1574323347407-f5e1ad6d020b":/mi |mie|instan/.test(name)?"photo-1569718212165-3a8278d5f624":/minuman|air mineral/.test(name)?"photo-1544145945-f90425340c7e":"photo-1542838132-92c53300491e";
- return `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${size}&q=80`;
+function productKind(product){
+ const name=String(product.nama||"").toLowerCase(),category=String(product.kategori||"").toLowerCase();
+ if(/air mineral|air minum|mineral water|bottled water/.test(name))return "water";
+ if(/\bmi\b|\bmie\b|noodle|instan/.test(name))return "noodles";
+ if(/beras|rice/.test(name))return "rice";
+ if(/minyak goreng|cooking oil/.test(name))return "oil";
+ if(/tepung|flour/.test(name))return "flour";
+ if(/gula|sugar/.test(name))return "sugar";
+ if(/minuman|beverage|drink/.test(name))return "drink";
+ if(/beras|serealia|rice/.test(category))return "rice";
+ if(/\bmi\b|\bmie\b|noodle|instan/.test(category))return "noodles";
+ if(/air mineral|air minum|minuman|beverage|drink/.test(category))return "drink";
+ if(/minyak|cooking oil/.test(category))return "oil";
+ if(/tepung|flour/.test(category)&&!/gula|sugar/.test(category))return "flour";
+ if(/gula|sugar/.test(category)&&!/tepung|flour/.test(category))return "sugar";
+ return "other";
 }
-function productImage(product,size=240){return `<img src="${productPhoto(product,size)}" alt="${esc(product.nama)}" loading="lazy" onerror="this.style.display='none'">`}
+function productImage(product){
+ const kind=productKind(product);
+ const scenes={
+  water:'<path d="M224 61h32v31l15 24v128a20 20 0 0 1-20 20h-22a20 20 0 0 1-20-20V116l15-24z" fill="#dff6ff" stroke="#168bd2" stroke-width="5"/><path d="M224 61h32v18h-32z" rx="4" fill="#1674c5"/><path d="M211 145h58v53h-58z" rx="8" fill="#168bd2"/><path d="M218 154h44v7h-44zm0 15h31v5h-31z" fill="#fff"/><text x="240" y="187" text-anchor="middle" fill="#fff" font-size="9" font-weight="800">AIR MINERAL</text>',
+  noodles:'<path d="M151 78 321 63l14 168-174 8z" rx="13" fill="#f9aa26" stroke="#d85820" stroke-width="6"/><path d="m164 99 142-12 3 28-142 13z" fill="#d93424"/><circle cx="240" cy="160" r="42" fill="#fff4cb" stroke="#fff" stroke-width="5"/><path d="M210 155c13-21 41-21 57-2m-55 13c14-18 39-18 55-2m-45 18c13-12 28-11 39 0" fill="none" stroke="#e99a20" stroke-width="6" stroke-linecap="round"/><text x="240" y="222" text-anchor="middle" fill="#fff" font-size="12" font-weight="900">MI INSTAN</text>',
+  rice:'<path d="m166 111 20-41h108l20 41 15 120q-89 39-178 0z" fill="#f4dfaa" stroke="#bc9654" stroke-width="5"/><path d="M186 76h108v31H186z" fill="#fff0c9" stroke="#bc9654" stroke-width="4"/><path d="M181 145h118v49H181z" fill="#fff9e9"/><path d="M200 158c13-15 25-15 38 0s25 15 38 0" fill="none" stroke="#c3a164" stroke-width="5" stroke-linecap="round"/><text x="240" y="184" text-anchor="middle" fill="#856334" font-size="11" font-weight="900">BERAS</text>',
+  oil:'<path d="M224 57h32v34l22 22v130a20 20 0 0 1-20 20h-20a20 20 0 0 1-20-20V113l22-22z" fill="#f9d75a" stroke="#d79b1d" stroke-width="5"/><path d="M224 57h32v18h-32z" fill="#e39316"/><path d="M214 146h52v49h-52z" fill="#fff6d5"/><text x="240" y="165" text-anchor="middle" fill="#95610a" font-size="9" font-weight="900">MINYAK</text><text x="240" y="179" text-anchor="middle" fill="#95610a" font-size="8" font-weight="800">GORENG</text>',
+  sugar:'<path d="m176 85 128 0 18 24-10 137q-70 27-150 0l-9-137z" fill="#fff" stroke="#8db3d5" stroke-width="5"/><path d="M176 109h137l-3 29H178z" fill="#8cc8ef"/><path d="M188 164h112v43H188z" fill="#eff8ff"/><path d="M208 177h8m8 0h8m8 0h8m8 0h8m8 0h8m8 0h8M214 191h8m8 0h8m8 0h8m8 0h8m8 0h8" stroke="#d7e8f5" stroke-width="5" stroke-linecap="round"/><text x="244" y="132" text-anchor="middle" fill="#fff" font-size="11" font-weight="900">GULA PASIR</text>',
+  flour:'<path d="m176 85 128 0 18 24-10 137q-70 27-150 0l-9-137z" fill="#fff" stroke="#b9c9da" stroke-width="5"/><path d="M176 109h137l-3 29H178z" fill="#e8edf3"/><path d="M188 160h112v48H188z" fill="#f8fafc"/><path d="M213 192c11-20 22-20 33 0 11-20 22-20 33 0" fill="none" stroke="#d5a45e" stroke-width="5" stroke-linecap="round"/><text x="244" y="132" text-anchor="middle" fill="#536579" font-size="11" font-weight="900">TEPUNG</text>',
+  drink:'<path d="M224 57h32v34l22 22v130a20 20 0 0 1-20 20h-20a20 20 0 0 1-20-20V113l22-22z" fill="#c4f0d4" stroke="#2d9b66" stroke-width="5"/><path d="M224 57h32v18h-32z" fill="#238451"/><path d="M214 146h52v49h-52z" fill="#fff"/><text x="240" y="175" text-anchor="middle" fill="#238451" font-size="9" font-weight="900">MINUMAN</text>',
+  other:'<path d="m176 85 128 0 18 24-10 137q-70 27-150 0l-9-137z" fill="#fff" stroke="#8cb5d8" stroke-width="5"/><path d="M176 109h137l-3 29H178z" fill="#60a5fa"/><path d="M207 166h66v42h-66z" rx="8" fill="#eaf5ff"/><path d="M220 181h40" stroke="#9bbbd8" stroke-width="5" stroke-linecap="round"/><text x="244" y="132" text-anchor="middle" fill="#fff" font-size="10" font-weight="900">PRODUK TOKO</text>'
+ };
+ return `<svg class="product-art product-art--${kind}" viewBox="0 0 480 300" role="img" aria-label="${esc(product.nama)}" focusable="false"><rect width="480" height="300" rx="12" fill="currentColor" opacity=".1"/><ellipse cx="240" cy="263" rx="105" ry="13" fill="#17436b" opacity=".12"/>${scenes[kind]}</svg>`;
+}
+function renderWelcomeProducts(){
+ const display=$("#welcomeProductDisplay");
+ if(!display)return;
+ const showcase=["water","noodles","rice"].map(kind=>products.find(p=>productKind(p)===kind)||demoProducts.find(p=>productKind(p)===kind));
+ display.innerHTML=showcase.map(p=>`<div class="welcome-product">${productImage(p)}</div>`).join("");
+}
 const demoProducts=[
 {id:"local-p1",sku:"BRG-001",nama:"Beras Premium 5 kg",kategori:"Beras & Serealia",satuan:"pack",harga_beli:65000,harga_jual:72000,stok:25,stok_minimum:5,aktif:true},
 {id:"local-p2",sku:"BRG-002",nama:"Minyak Goreng 1 L",kategori:"Minyak & Bumbu",satuan:"liter",harga_beli:15500,harga_jual:18000,stok:40,stok_minimum:10,aktif:true},
@@ -69,7 +100,7 @@ async function loadData(){
  } else {loadLocal();saleItems=[];}
  renderAll();
 }
-function renderAll(){renderDashboard();renderProducts();renderSaleProducts();renderCustomers();renderSalesReport();populateCustomers();populateStockInProducts();renderCart();}
+function renderAll(){renderDashboard();renderProducts();renderSaleProducts();renderCustomers();renderSalesReport();populateCustomers();populateStockInProducts();renderCart();renderWelcomeProducts();}
 function populateStockInProducts(){const s=$("#stockInProduct");if(!s)return;const old=s.value;s.innerHTML=products.filter(p=>p.aktif!==false).map(p=>`<option value="${esc(p.id)}">${esc(p.sku)} — ${esc(p.nama)} (stok ${p.stok})</option>`).join("")||'<option value="">Belum ada barang</option>';if(products.some(p=>String(p.id)===old))s.value=old;const p=products.find(p=>String(p.id)===s.value);if(p)$("#stockInCost").value=p.harga_beli;}
 function page(name){$$(".page").forEach(p=>p.classList.toggle("hidden",p.id!=="page-"+name));$$(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===name));$("#breadcrumb").textContent=({dashboard:"Dashboard",inventory:"Persediaan Barang",sales:"Penjualan / Kasir",customers:"Pelanggan",reports:"Laporan Keuangan"})[name]||"Dashboard";$("#sidebar").classList.remove("open");$("#scrim").classList.remove("show");if(name==="sales")renderSaleProducts();}
 function productValue(p){return Number(p.stok||0)*Number(p.harga_beli||0)}
