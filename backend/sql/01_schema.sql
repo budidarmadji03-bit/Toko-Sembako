@@ -1,4 +1,4 @@
--- Toko Sembako schema: jalankan di Supabase SQL Editor sebelum 02_rpc.sql.
+-- Toko Budi Sembako schema: jalankan di Supabase SQL Editor sebelum 02_rpc.sql.
 create extension if not exists pgcrypto;
 
 create table if not exists public.barang (

@@ -2,14 +2,14 @@
 <html lang="id">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#6d28d9"><title>Toko Sembako — Penjualan & Persediaan</title>
+  <meta name="theme-color" content="#6d28d9"><title>Toko Budi Sembako — Penjualan & Persediaan</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
 <div class="app">
   <aside id="sidebar" class="sidebar">
-    <div class="brand"><div class="brand-logo"><i class="fa-solid fa-basket-shopping"></i></div><div><b>Toko Sembako</b><small>Sistem Penjualan & Persediaan</small></div><button id="closeSidebar" class="mobile-close"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="brand"><div class="brand-logo"><i class="fa-solid fa-basket-shopping"></i></div><div><b>Toko Budi Sembako</b><small>Sistem Penjualan & Persediaan</small></div><button id="closeSidebar" class="mobile-close"><i class="fa-solid fa-xmark"></i></button></div>
     <div class="nav-label">MENU UTAMA</div>
     <nav>
       <button class="nav-item active" data-page="dashboard"><i class="fa-solid fa-chart-pie"></i>Dashboard</button>
@@ -26,7 +26,7 @@
     <div class="content">
       <section id="page-dashboard" class="page">
         <div class="page-title"><div><span class="eyebrow">RINGKASAN USAHA</span><h1>Dashboard</h1><p>Ringkasan aktivitas penjualan dan persediaan toko Anda.</p></div><button class="btn-primary" data-goto="sales"><i class="fa-solid fa-plus"></i> Transaksi baru</button></div>
-        <article class="welcome-banner"><div class="welcome-copy"><span class="welcome-tag"><i class="fa-solid fa-sparkles"></i> TOKO ANDA, LEBIH TERATUR</span><h2>Selamat datang di<br><strong>Toko Sembako</strong></h2><p>Pantau stok, layani pelanggan, dan lihat perkembangan usaha dalam satu tempat.</p><button class="welcome-action" data-goto="sales">Mulai transaksi <i class="fa-solid fa-arrow-right"></i></button></div><div class="welcome-image"><img src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&amp;fit=crop&amp;w=900&amp;q=85" alt="Pilihan sayuran segar untuk toko sembako" loading="eager" onerror="this.style.display='none'"><span class="welcome-image-label"><i class="fa-solid fa-leaf"></i> Belanja harian, lebih mudah</span></div></article>
+        <article class="welcome-banner"><div class="welcome-copy"><span class="welcome-tag"><i class="fa-solid fa-sparkles"></i> TOKO ANDA, LEBIH TERATUR</span><h2>Selamat datang di<br><strong>Toko Budi Sembako</strong></h2><p>Pantau stok, layani pelanggan, dan lihat perkembangan usaha dalam satu tempat.</p><button class="welcome-action" data-goto="sales">Mulai transaksi <i class="fa-solid fa-arrow-right"></i></button></div><div class="welcome-image"><img src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&amp;fit=crop&amp;w=900&amp;q=85" alt="Pilihan sayuran segar untuk toko sembako" loading="eager" onerror="this.style.display='none'"><span class="welcome-image-label"><i class="fa-solid fa-leaf"></i> Belanja harian, lebih mudah</span></div></article>
         <div class="stats">
           <article class="stat"><div class="stat-head"><span class="stat-icon purple"><i class="fa-solid fa-wallet"></i></span><span>Penjualan hari ini</span></div><b id="todaySales">Rp0</b><small id="todayTransactions">0 transaksi hari ini</small></article>
           <article class="stat"><div class="stat-head"><span class="stat-icon blue"><i class="fa-solid fa-box"></i></span><span>Jenis barang</span></div><b id="productCount">0</b><small>Barang aktif</small></article>
@@ -69,7 +69,7 @@
         <article class="panel section-gap"><div class="panel-head"><div><h2>Beban operasional</h2><p>Biaya rutin toko yang dicatat dalam periode ini</p></div></div><div id="expensesTable" class="table-scroll"></div></article>
       </section>
     </div>
-    <footer class="footer">Toko Sembako · Sistem Informasi Penjualan & Persediaan <span>HTML · CSS · JavaScript · Supabase</span></footer>
+    <footer class="footer">Toko Budi Sembako · Sistem Informasi Penjualan & Persediaan <span>HTML · CSS · JavaScript · Supabase</span></footer>
   </main>
 </div>
 <dialog id="productDialog" class="modal"><form id="productForm" class="modal-card"><div class="modal-head"><div><span class="eyebrow">MASTER BARANG</span><h2 id="productModalTitle">Tambah barang</h2></div><button type="button" class="close-modal" data-close="productDialog"><i class="fa-solid fa-xmark"></i></button></div><input id="productId" type="hidden"><div class="form-grid"><div class="field"><label for="sku">SKU / Kode barang *</label><input id="sku" class="control" required maxlength="50" placeholder="BRG-001"></div><div class="field"><label for="productName">Nama barang *</label><input id="productName" class="control" required maxlength="150" placeholder="Beras Premium 5 kg"></div><div class="field"><label for="productCategory">Kategori *</label><select id="productCategory" class="control" required><option value="">Pilih kategori</option><option>Beras & Serealia</option><option>Minyak & Bumbu</option><option>Gula & Tepung</option><option>Mi & Makanan Instan</option><option>Minuman</option><option>Produk Rumah Tangga</option><option>Lainnya</option></select></div><div class="field"><label for="unit">Satuan *</label><select id="unit" class="control" required><option value="pcs">pcs</option><option value="kg">kg</option><option value="liter">liter</option><option value="pack">pack</option><option value="dus">dus</option><option value="sak">sak</option><option value="botol">botol</option></select></div><div class="field"><label for="buyPrice">Harga beli per satuan (Rp) *</label><input id="buyPrice" class="control" type="number" min="0" step="0.01" required></div><div class="field"><label for="sellPrice">Harga jual per satuan (Rp) *</label><input id="sellPrice" class="control" type="number" min="0" step="0.01" required></div><div class="field"><label for="stockQty">Stok awal *</label><input id="stockQty" class="control" type="number" min="0" step="0.001" required value="0"></div><div class="field"><label for="minStock">Batas minimum stok *</label><input id="minStock" class="control" type="number" min="0" step="0.001" required value="5"></div></div><div id="productError" class="error-box hidden"></div><div class="modal-actions"><button type="button" class="btn-secondary" data-close="productDialog">Batal</button><button type="submit" class="btn-primary">Simpan barang</button></div></form></dialog>
