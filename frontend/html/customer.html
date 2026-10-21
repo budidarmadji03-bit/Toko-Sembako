@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#9333ea">
+  <title>Katalog Pelanggan — Toko Budi Sembako</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="customer-body">
+  <header class="customer-header">
+    <a class="customer-brand" href="customer.html"><span class="brand-logo"><i class="fa-solid fa-basket-shopping"></i></span><span><b>Toko Budi Sembako</b><small>Katalog Pelanggan</small></span></a>
+    <div class="customer-account"><span id="customerGreeting">Memuat akun...</span><button id="logoutButton" class="btn-secondary" type="button">Keluar</button></div>
+  </header>
+  <main class="customer-content">
+    <section class="customer-welcome">
+      <div><span class="eyebrow">BELANJA SEMBAKO</span><h1>Belanja kebutuhan harian Anda</h1><p>Pilih produk yang tersedia, lalu kirim pesanan untuk dikonfirmasi Toko Budi Sembako.</p></div>
+      <button id="showProfile" class="btn-secondary" type="button"><i class="fa-regular fa-user"></i> Profil saya</button>
+    </section>
+    <div id="customerMessage" class="customer-message hidden" role="status" aria-live="polite"></div>
+    <section class="customer-columns">
+      <div>
+        <div class="toolbar customer-toolbar">
+          <label class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="catalogSearch" type="search" placeholder="Cari nama atau kategori produk"></label>
+          <select id="categoryFilter" class="control compact" aria-label="Filter kategori"><option value="">Semua kategori</option></select>
+        </div>
+        <div id="catalog" class="customer-catalog"></div>
+        <section class="panel customer-orders">
+          <div class="panel-head"><div><h2>Pesanan saya</h2><p>Status dan riwayat pesanan akun Anda.</p></div><button id="refreshOrders" class="text-btn" type="button">Muat ulang</button></div>
+          <div id="orders"></div>
+        </section>
+      </div>
+      <aside class="panel customer-cart">
+        <div class="panel-head"><div><h2>Keranjang</h2><p id="cartCount">0 produk</p></div><button id="clearCart" class="text-btn danger-text" type="button">Kosongkan</button></div>
+        <div id="cartItems" class="customer-cart-items"></div>
+        <div class="field"><label for="recipientName">Nama penerima *</label><input id="recipientName" class="control" maxlength="120" required autocomplete="name"></div>
+        <div class="field"><label for="recipientPhone">Nomor telepon *</label><input id="recipientPhone" class="control" maxlength="40" required autocomplete="tel"></div>
+        <div class="field"><label for="deliveryAddress">Alamat pengantaran *</label><textarea id="deliveryAddress" class="control" rows="3" maxlength="400" required autocomplete="street-address"></textarea></div>
+        <div class="field"><label for="deliveryNote">Catatan untuk toko/kurir</label><textarea id="deliveryNote" class="control" rows="2" maxlength="300" placeholder="Patokan rumah, waktu penerimaan, dan lain-lain"></textarea></div>
+        <div class="field"><label for="paymentMethod">Metode pembayaran</label><select id="paymentMethod" class="control"><option value="cash">Tunai saat pesanan diterima</option><option value="transfer">Transfer (dikonfirmasi Owner)</option><option value="qris">QRIS (dikonfirmasi Owner)</option><option value="debit">Kartu debit di toko</option></select></div>
+        <div class="customer-total"><span>Total pesanan</span><b id="cartTotal">Rp0</b></div>
+        <p class="customer-payment-note">Pesanan menunggu konfirmasi Owner. Pembayaran belum diproses secara online. Stok akan dipesan setelah checkout.</p>
+        <button id="checkoutButton" class="btn-primary" type="button" disabled><i class="fa-solid fa-truck-fast"></i> Pesan antar</button>
+      </aside>
+    </section>
+  </main>
+  <dialog id="profileDialog" class="modal">
+    <form id="profileForm" class="modal-card narrow">
+      <div class="modal-head"><div><span class="eyebrow">AKUN PELANGGAN</span><h2>Profil saya</h2></div><button type="button" class="close-modal" data-close="profileDialog" aria-label="Tutup"><i class="fa-solid fa-xmark"></i></button></div>
+      <label class="field">Nama<input id="profileName" class="control" maxlength="120" required></label>
+      <label class="field">Telepon<input id="profilePhone" class="control" maxlength="40" autocomplete="tel"></label>
+      <label class="field">Alamat pengiriman<input id="profileAddress" class="control" maxlength="400" autocomplete="street-address"></label>
+      <div id="profileError" class="error-box hidden"></div>
+      <div class="modal-actions"><button type="button" class="btn-secondary" data-close="profileDialog">Batal</button><button class="btn-primary" type="submit">Simpan profil</button></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase-auth.js"></script>
+  <script src="../js/receipt.js?v=receipt-2"></script>
+  <script src="../js/customer.js?v=receipt-1"></script>
+</body>
+</html>

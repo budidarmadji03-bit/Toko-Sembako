@@ -53,7 +53,7 @@ create table if not exists public.mutasi_persediaan (
   id uuid primary key default gen_random_uuid(),
   barang_id uuid not null references public.barang(id) on delete restrict,
   tanggal timestamptz not null default now(),
-  tipe text not null check(tipe in ('saldo_awal','penjualan','penyesuaian','pembatalan')),
+  tipe text not null check(tipe in ('saldo_awal','pembelian','penjualan','penyesuaian','pembatalan')),
   referensi text,
   qty_masuk numeric(14,3) not null default 0 check(qty_masuk>=0),
   qty_keluar numeric(14,3) not null default 0 check(qty_keluar>=0),
@@ -61,6 +61,11 @@ create table if not exists public.mutasi_persediaan (
   catatan text,
   created_at timestamptz not null default now()
 );
+alter table public.mutasi_persediaan
+  drop constraint if exists mutasi_persediaan_tipe_check;
+alter table public.mutasi_persediaan
+  add constraint mutasi_persediaan_tipe_check
+  check(tipe in ('saldo_awal','pembelian','penjualan','penyesuaian','pembatalan'));
 create table if not exists public.pembelian_stok (
   id uuid primary key default gen_random_uuid(),
   barang_id uuid not null references public.barang(id) on delete restrict,
@@ -125,13 +130,87 @@ alter table public.mutasi_persediaan enable row level security;
 alter table public.pembelian_stok enable row level security;
 alter table public.beban_operasional enable row level security;
 
--- POLICY DEMO: akses publik untuk pengembangan saja, tanpa login.
--- Sebelum produksi, ganti dengan kebijakan berbasis auth.uid() dan role pengguna.
-do $$ declare t text; begin
-  foreach t in array array['barang','pelanggan','penjualan','detail_penjualan','mutasi_persediaan','pembelian_stok','beban_operasional'] loop
-    execute format('drop policy if exists "Demo full access %s" on public.%I',t,t);
-    execute format('create policy "Demo full access %s" on public.%I for all to anon, authenticated using (true) with check (true)',t,t);
-    execute format('grant select, insert, update, delete on public.%I to anon, authenticated',t);
-  end loop;
-end $$;
-grant usage on schema public to anon, authenticated;
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  role text not null default 'customer' check(role in ('owner','customer')),
+  created_at timestamptz not null default now()
+);
+alter table public.profiles enable row level security;
+
+create or replace function public.is_owner()
+returns boolean
+language sql
+stable
+security definer
+set search_path=public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id=auth.uid() and role='owner'
+  );
+$$;
+
+create or replace function public.handle_new_auth_user()
+returns trigger
+language plpgsql
+security definer
+set search_path=public
+as $$
+begin
+  insert into public.profiles(id,role) values(new.id,'customer');
+  return new;
+end;
+$$;
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_auth_user();
+insert into public.profiles(id,role)
+  select id,'customer' from auth.users
+  on conflict(id) do nothing;
+
+create or replace view public.customer_catalog as
+  select id,sku,nama,kategori,satuan,harga_jual,stok,aktif,created_at,updated_at
+  from public.barang
+  where aktif=true;
+
+drop policy if exists "Demo full access barang" on public.barang;
+drop policy if exists "Demo full access pelanggan" on public.pelanggan;
+drop policy if exists "Demo full access penjualan" on public.penjualan;
+drop policy if exists "Demo full access detail_penjualan" on public.detail_penjualan;
+drop policy if exists "Demo full access mutasi_persediaan" on public.mutasi_persediaan;
+drop policy if exists "Demo full access pembelian_stok" on public.pembelian_stok;
+drop policy if exists "Demo full access beban_operasional" on public.beban_operasional;
+
+drop policy if exists "Owner full access barang" on public.barang;
+drop policy if exists "Owner full access pelanggan" on public.pelanggan;
+drop policy if exists "Owner full access penjualan" on public.penjualan;
+drop policy if exists "Owner full access detail_penjualan" on public.detail_penjualan;
+drop policy if exists "Owner full access mutasi_persediaan" on public.mutasi_persediaan;
+drop policy if exists "Owner full access pembelian_stok" on public.pembelian_stok;
+drop policy if exists "Owner full access beban_operasional" on public.beban_operasional;
+create policy "Owner full access barang" on public.barang for all to authenticated using (public.is_owner()) with check (public.is_owner());
+create policy "Owner full access pelanggan" on public.pelanggan for all to authenticated using (public.is_owner()) with check (public.is_owner());
+create policy "Owner full access penjualan" on public.penjualan for all to authenticated using (public.is_owner()) with check (public.is_owner());
+create policy "Owner full access detail_penjualan" on public.detail_penjualan for all to authenticated using (public.is_owner()) with check (public.is_owner());
+create policy "Owner full access mutasi_persediaan" on public.mutasi_persediaan for all to authenticated using (public.is_owner()) with check (public.is_owner());
+create policy "Owner full access pembelian_stok" on public.pembelian_stok for all to authenticated using (public.is_owner()) with check (public.is_owner());
+create policy "Owner full access beban_operasional" on public.beban_operasional for all to authenticated using (public.is_owner()) with check (public.is_owner());
+
+drop policy if exists "Read own profile or owner" on public.profiles;
+create policy "Read own profile or owner" on public.profiles
+  for select to authenticated using (id=auth.uid() or public.is_owner());
+
+revoke all on public.barang,public.pelanggan,public.penjualan,public.detail_penjualan,
+  public.mutasi_persediaan,public.pembelian_stok,public.beban_operasional,public.profiles
+  from anon,authenticated;
+grant select,insert,update,delete on public.barang,public.pelanggan,public.penjualan,
+  public.detail_penjualan,public.mutasi_persediaan,public.pembelian_stok,public.beban_operasional
+  to authenticated;
+grant select on public.profiles,public.customer_catalog to authenticated;
+revoke all on public.customer_catalog from public,anon;
+revoke all on function public.is_owner() from public,anon;
+grant execute on function public.is_owner() to authenticated;
+revoke all on function public.handle_new_auth_user() from public,anon,authenticated;
+revoke usage on schema public from anon;
+grant usage on schema public to authenticated;

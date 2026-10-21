@@ -16,9 +16,9 @@ declare
   v_sale_id uuid:=gen_random_uuid();
   v_invoice text;
   v_subtotal numeric(14,2):=0;
-  v_discount numeric(14,2):=greatest(coalesce(p_discount,0),0);
+  v_discount numeric(14,2):=coalesce(p_discount,0);
   v_total numeric(14,2);
-  v_paid numeric(14,2):=greatest(coalesce(p_amount_paid,0),0);
+  v_paid numeric(14,2):=coalesce(p_amount_paid,0);
   v_change numeric(14,2);
   v_item jsonb;
   v_product public.barang%rowtype;
@@ -32,7 +32,16 @@ begin
     raise exception 'Keranjang penjualan kosong.';
   end if;
   if v_discount<0 then raise exception 'Diskon tidak boleh negatif.'; end if;
+  if v_paid<0 then raise exception 'Jumlah dibayar tidak boleh negatif.'; end if;
   if v_method not in ('cash','transfer','qris','debit') then raise exception 'Metode pembayaran tidak valid.'; end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(p_items) as items(item)
+    group by item->>'product_id'
+    having count(*)>1
+  ) then
+    raise exception 'Barang yang sama tidak boleh muncul lebih dari sekali di keranjang.';
+  end if;
 
   -- Lock baris produk satu per satu agar dua kasir tidak menjual stok yang sama.
   for v_item in select value from jsonb_array_elements(p_items) loop
@@ -96,23 +105,29 @@ create or replace function public.record_stock_in(
   p_note text default null
 )
 returns jsonb language plpgsql security invoker set search_path=public as $$
-declare v_product public.barang%rowtype; v_new_stock numeric(14,3); v_new_cost numeric(14,2);
+declare v_product public.barang%rowtype; v_new_stock numeric(14,3); v_new_cost numeric(14,2); v_purchase_cost numeric(14,2);
 begin
   if p_qty is null or p_qty<=0 then raise exception 'Jumlah stok masuk harus lebih besar dari nol.'; end if;
   if p_unit_cost is null or p_unit_cost<0 then raise exception 'Harga beli tidak boleh negatif.'; end if;
   select * into v_product from public.barang where id=p_product_id and aktif=true for update;
   if not found then raise exception 'Barang tidak ditemukan atau tidak aktif.'; end if;
-  -- Update harga beli terakhir; nilai stok di dashboard menggunakan qty x harga beli terakhir.
-  v_new_cost:=round(p_unit_cost,2);
+  v_purchase_cost:=round(p_unit_cost,2);
+  v_new_cost:=round(
+    ((v_product.stok*v_product.harga_beli)+(p_qty*v_purchase_cost))/(v_product.stok+p_qty),
+    2
+  );
   perform set_config('retailpro.stock_mutation','stock_in',true);
   update public.barang set stok=stok+p_qty,harga_beli=v_new_cost where id=p_product_id returning stok into v_new_stock;
   insert into public.mutasi_persediaan(barang_id,tipe,referensi,qty_masuk,qty_keluar,stok_setelah,catatan)
-  values(p_product_id,'penyesuaian',null,p_qty,0,v_new_stock,coalesce(p_note,'Stok masuk'));
+  values(p_product_id,'pembelian',null,p_qty,0,v_new_stock,coalesce(p_note,'Stok masuk'));
   insert into public.pembelian_stok(barang_id,jumlah,harga_satuan,total,catatan)
-  values(p_product_id,p_qty,v_new_cost,round(p_qty*v_new_cost,2),nullif(trim(p_note),''));
-  return jsonb_build_object('product_id',p_product_id,'qty_masuk',p_qty,'stok_setelah',v_new_stock);
+  values(p_product_id,p_qty,v_purchase_cost,round(p_qty*v_purchase_cost,2),nullif(trim(p_note),''));
+  return jsonb_build_object('product_id',p_product_id,'qty_masuk',p_qty,'stok_setelah',v_new_stock,'biaya_rata_rata',v_new_cost);
 end; $$;
 
-grant execute on function public.record_stock_in(uuid,numeric,numeric,text) to anon,authenticated;
-grant execute on function public.create_sale(uuid,numeric,text,numeric,jsonb) to anon,authenticated;
-grant execute on function public.cancel_sale(uuid) to anon,authenticated;
+revoke all on function public.record_stock_in(uuid,numeric,numeric,text) from public,anon;
+revoke all on function public.create_sale(uuid,numeric,text,numeric,jsonb) from public,anon;
+revoke all on function public.cancel_sale(uuid) from public,anon;
+grant execute on function public.record_stock_in(uuid,numeric,numeric,text) to authenticated;
+grant execute on function public.create_sale(uuid,numeric,text,numeric,jsonb) to authenticated;
+grant execute on function public.cancel_sale(uuid) to authenticated;

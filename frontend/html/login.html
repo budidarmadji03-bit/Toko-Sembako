@@ -1,3 +1,63 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>Masuk — Toko Budi Sembako</title><link rel="stylesheet" href="../css/style.css"></head><body class="login-body"><form id="loginForm" class="login-card"><div class="brand-logo login-logo"><i class="fa-solid fa-basket-shopping"></i></div><h1>Masuk Toko Budi Sembako</h1><p>Login opsional jika Supabase Auth telah diaktifkan.</p><label class="field">Email<input id="email" type="email" class="control" required></label><label class="field">Password<input id="password" type="password" class="control" required></label><button class="btn-primary" type="submit">Masuk</button><div id="loginMessage" class="hint"></div><a href="index.html">Kembali ke aplikasi demo</a></form><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="../js/config.js"></script><script>
-document.querySelector("#loginForm").addEventListener("submit",async e=>{e.preventDefault();const msg=document.querySelector("#loginMessage");try{const c=window.RetailConfig.getClient();if(!c)throw new Error("Konfigurasikan Supabase terlebih dahulu di halaman aplikasi.");const {error}=await c.auth.signInWithPassword({email:document.querySelector("#email").value,password:document.querySelector("#password").value});if(error)throw error;msg.textContent="Login berhasil. Kembali ke aplikasi."; }catch(err){msg.textContent=err.message||"Login gagal";}});
-</script></body></html>
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#7c3aed"><title>Masuk — Toko Budi Sembako</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="login-body">
+  <form id="loginForm" class="login-card">
+    <div class="brand-logo login-logo"><i class="fa-solid fa-basket-shopping"></i></div>
+    <h1>Masuk Toko Budi Sembako</h1>
+    <p>Gunakan akun Supabase Anda. Pelanggan dapat mendaftar agar katalog, stok, dan pesanan terhubung ke toko.</p>
+    <label class="field">Email<input id="email" type="email" class="control" autocomplete="username" required></label>
+    <label class="field">Password
+      <span class="password-control"><input id="password" type="password" class="control" autocomplete="current-password" required><button id="togglePassword" class="btn-secondary" type="button">Tampilkan</button></span>
+    </label>
+    <button id="loginButton" class="btn-primary" type="submit"><span id="loginButtonText">Masuk</span></button>
+    <div id="loginMessage" class="hint" role="status" aria-live="polite"></div>
+    <button id="showRecovery" class="text-btn" type="button">Lupa password?</button>
+    <button id="showRegister" class="text-btn" type="button">Daftar sebagai pelanggan</button>
+    <small class="local-security-note">Akun pelanggan dan pesanan nyata menggunakan Supabase. Pendaftaran mungkin memerlukan konfirmasi email sebelum Anda dapat masuk.</small>
+    <a class="demo-preview-link" href="demo.html"><i class="fa-solid fa-eye"></i> Pratinjau DEMO terpisah (opsional)</a>
+  </form>
+  <form id="registerForm" class="login-card hidden">
+    <div class="brand-logo login-logo"><i class="fa-solid fa-basket-shopping"></i></div>
+    <h1>Daftar Pelanggan</h1>
+    <p>Akun yang didaftarkan di sini selalu memiliki role pelanggan.</p>
+    <label class="field">Nama<input id="registerName" type="text" class="control" autocomplete="name" maxlength="120" required></label>
+    <label class="field">Email<input id="registerEmail" type="email" class="control" autocomplete="email" required></label>
+    <label class="field">Password<input id="registerPassword" type="password" class="control" autocomplete="new-password" minlength="8" required></label>
+    <button class="btn-primary" type="submit">Buat akun pelanggan</button>
+    <div id="registerMessage" class="hint" role="status" aria-live="polite"></div>
+    <button id="showLogin" class="text-btn" type="button">Kembali ke login</button>
+  </form>
+  <form id="recoveryForm" class="login-card hidden">
+    <div class="brand-logo login-logo"><i class="fa-solid fa-basket-shopping"></i></div>
+    <h1>Atur ulang password</h1>
+    <p>Masukkan email akun pelanggan Anda. Jika akun tersedia, Supabase akan mengirim tautan untuk menetapkan password baru.</p>
+    <label class="field">Email<input id="recoveryEmail" type="email" class="control" autocomplete="email" required></label>
+    <button id="recoveryButton" class="btn-primary" type="submit">Kirim tautan reset</button>
+    <div id="recoveryMessage" class="hint" role="status" aria-live="polite"></div>
+    <small class="local-security-note">Tautan pemulihan harus kembali ke alamat aplikasi yang diizinkan pada Supabase Authentication → URL Configuration. Saat aplikasi dibuka sebagai file lokal, Supabase menggunakan Site URL proyek.</small>
+    <button id="backFromRecovery" class="text-btn" type="button">Kembali ke login</button>
+  </form>
+  <form id="setPasswordForm" class="login-card hidden">
+    <div class="brand-logo login-logo"><i class="fa-solid fa-basket-shopping"></i></div>
+    <h1 id="setPasswordTitle">Aktifkan Akun</h1>
+    <p id="setPasswordDescription">Buat kata sandi untuk menyelesaikan undangan dan mengaktifkan akun Anda.</p>
+    <label class="field">Kata sandi baru<input id="newPassword" type="password" class="control" autocomplete="new-password" minlength="8" required></label>
+    <label class="field">Ulangi kata sandi<input id="confirmPassword" type="password" class="control" autocomplete="new-password" minlength="8" required></label>
+    <button id="setPasswordButton" class="btn-primary" type="submit">Simpan kata sandi</button>
+    <div id="setPasswordMessage" class="hint" role="status" aria-live="polite"></div>
+  </form>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/supabase-auth.js"></script>
+  <script src="../js/login.js"></script>
+</body>
+</html>

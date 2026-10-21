@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#9333ea">
+  <title>Belanja — Toko Budi Sembako</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="customer-body">
+  <header class="customer-header">
+    <a class="customer-brand" href="../index.html"><span class="brand-logo"><i class="fa-solid fa-basket-shopping"></i></span><span><b>Toko Budi Sembako</b><small>Belanja tanpa akun</small></span></a>
+    <div class="customer-account"><a class="btn-secondary" href="../index.html">Beranda</a></div>
+  </header>
+  <main class="customer-content">
+    <section class="customer-welcome">
+      <div><span class="eyebrow">PESANAN PELANGGAN</span><h1>Belanja kebutuhan harian Anda</h1><p>Pilih produk yang tersedia, kirim pesanan, lalu simpan kode pelacakan untuk memeriksa status pengiriman.</p></div>
+    </section>
+    <div class="demo-preview-notice"><i class="fa-solid fa-circle-info"></i><span>Pesanan langsung masuk ke sistem Owner dan stok akan direservasi. Pesanan menunggu konfirmasi; pembayaran belum diproses online dan baru dicatat setelah pesanan diselesaikan oleh Owner.</span></div>
+    <div id="guestMessage" class="customer-message hidden" role="status" aria-live="polite"></div>
+    <div id="guestSetupError" class="demo-preview-notice hidden" role="alert"></div>
+    <section class="customer-columns">
+      <div>
+        <div class="toolbar customer-toolbar">
+          <label class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="guestSearch" type="search" placeholder="Cari nama atau kategori produk"></label>
+          <select id="guestCategory" class="control compact" aria-label="Filter kategori"><option value="">Semua kategori</option></select>
+        </div>
+        <div class="panel-head"><div><h2>Katalog toko</h2><p>Produk dan stok langsung dari Supabase.</p></div><button id="refreshGuestCatalog" class="btn-secondary" type="button"><i class="fa-solid fa-rotate"></i> Muat ulang</button></div>
+        <div id="guestCatalog" class="customer-catalog"><div class="empty"><i class="fa-solid fa-cloud-arrow-down"></i><b>Memuat katalog toko...</b></div></div>
+        <section class="panel customer-orders">
+          <div class="panel-head"><div><h2>Lacak pesanan</h2><p>Gunakan kode privat yang diberikan saat checkout.</p></div></div>
+          <div class="toolbar"><label class="field guest-track-input">Kode pelacakan<input id="trackingToken" class="control" autocomplete="off" placeholder="Tempel kode pelacakan"></label><button id="trackOrder" class="btn-secondary" type="button">Lacak</button></div>
+          <div id="trackingResult"></div>
+        </section>
+      </div>
+      <aside class="panel customer-cart">
+        <div class="panel-head"><div><h2>Keranjang</h2><p id="guestCartCount">0 produk</p></div><button id="clearGuestCart" class="text-btn danger-text" type="button">Kosongkan</button></div>
+        <div id="guestCartItems" class="customer-cart-items"></div>
+        <div class="field"><label for="guestName">Nama penerima *</label><input id="guestName" class="control" maxlength="120" required autocomplete="name"></div>
+        <div class="field"><label for="guestPhone">Nomor telepon *</label><input id="guestPhone" class="control" maxlength="40" required autocomplete="tel"></div>
+        <div class="field"><label for="guestAddress">Alamat pengantaran *</label><textarea id="guestAddress" class="control" rows="3" maxlength="400" required autocomplete="street-address"></textarea></div>
+        <div class="field"><label for="guestNote">Catatan untuk toko/kurir</label><textarea id="guestNote" class="control" rows="2" maxlength="300"></textarea></div>
+        <div class="field"><label for="guestPayment">Metode pembayaran</label><select id="guestPayment" class="control"><option value="cash">Tunai saat pesanan diterima</option><option value="transfer">Transfer (dikonfirmasi Owner)</option><option value="qris">QRIS (dikonfirmasi Owner)</option><option value="debit">Kartu debit di toko</option></select></div>
+        <div class="customer-total"><span>Total pesanan</span><b id="guestTotal">Rp0</b></div>
+        <button id="guestCheckout" class="btn-primary" type="button" disabled><i class="fa-solid fa-truck-fast"></i> Pesan antar</button>
+      </aside>
+    </section>
+  </main>
+  <div id="guestToast" class="toast" role="status" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/customer-guest.js"></script>
+</body>
+</html>

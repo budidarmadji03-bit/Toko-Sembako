@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#7c3aed"><title>Pratinjau DEMO — Toko Budi Sembako</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+  <link href="../css/style.css" rel="stylesheet">
+</head>
+<body class="demo-preview-body">
+  <main class="demo-preview">
+    <header class="demo-preview-header">
+      <a href="login.html" class="btn-secondary"><i class="fa-solid fa-arrow-left"></i> Kembali ke login</a>
+      <a href="customer-demo.html" class="btn-primary"><i class="fa-solid fa-basket-shopping"></i> Coba belanja pelanggan DEMO</a>
+      <span class="demo-preview-tag"><i class="fa-solid fa-circle-info"></i> PRATINJAU DATA DEMO</span>
+    </header>
+    <section class="page-title demo-preview-title">
+      <div><span class="eyebrow">DATA LOKAL TERISOLASI</span><h1>Produk & Pembelian DEMO</h1><p>Simulasi 14–20 Oktober 2026. Data contoh tidak terhubung ke Supabase; produk tambahan tersimpan lokal di browser.</p></div>
+    </section>
+    <div class="demo-preview-notice"><i class="fa-solid fa-triangle-exclamation"></i><span><strong>Semua data fiktif.</strong> Nama, SKU, pemasok, harga, stok, nota dan pembelian hanya contoh; jangan dipakai sebagai catatan usaha atau bukti transaksi.</span></div>
+    <section class="stats demo-preview-stats" aria-label="Ringkasan DEMO">
+      <article class="stat"><div class="stat-head"><span class="stat-icon purple"><i class="fa-solid fa-boxes-stacked"></i></span><span>Produk DEMO</span></div><b id="demoProductCount">0</b><small>SKU simulasi</small></article>
+      <article class="stat"><div class="stat-head"><span class="stat-icon blue"><i class="fa-solid fa-file-invoice"></i></span><span>Nota pembelian DEMO</span></div><b id="demoInvoiceCount">0</b><small>14–20 Oktober 2026</small></article>
+      <article class="stat"><div class="stat-head"><span class="stat-icon orange"><i class="fa-solid fa-cart-flatbed"></i></span><span>Baris pembelian DEMO</span></div><b id="demoPurchaseCount">0</b><small>Detail simulasi</small></article>
+      <article class="stat"><div class="stat-head"><span class="stat-icon green"><i class="fa-solid fa-money-bill-wave"></i></span><span>Total pembelian DEMO</span></div><b id="demoPurchaseTotal">Rp0</b><small>Nilai fiktif</small></article>
+    </section>
+    <article class="panel section-gap">
+      <div class="panel-head"><div><h2>Transaksi pembelian DEMO</h2><p>Filter tanggal untuk melihat nota simulasi per hari.</p></div><button id="exportDemoCsv" class="btn-secondary" type="button"><i class="fa-solid fa-file-csv"></i> Unduh CSV DEMO</button></div>
+      <div class="toolbar"><label class="date-field">Dari tanggal<input id="demoFrom" type="date" class="control" value="2026-10-14"></label><label class="date-field">Sampai tanggal<input id="demoTo" type="date" class="control" value="2026-10-20"></label><button id="applyDemoFilter" class="btn-secondary" type="button">Terapkan</button><button id="resetDemoFilter" class="btn-secondary" type="button">Reset</button></div>
+      <div id="demoPurchasesTable" class="table-scroll"></div>
+    </article>
+    <article class="panel section-gap">
+      <div class="panel-head"><div><h2>Master produk DEMO</h2><p>Harga dan jumlah di bawah ini hanya simulasi. Produk tambahan disimpan lokal di browser.</p></div><button id="addDemoProduct" class="btn-primary" type="button"><i class="fa-solid fa-plus"></i> Tambah produk DEMO</button></div>
+      <div id="demoProductsTable" class="table-scroll"></div>
+    </article>
+    <footer class="footer">Toko Budi Sembako · Pratinjau DEMO lokal <span>Tidak terhubung ke database produksi</span></footer>
+  </main>
+  <dialog id="demoProductDialog" class="modal">
+    <form id="demoProductForm" class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow">DATA LOKAL SAJA</span><h2>Tambah produk DEMO</h2><p>Produk dan fotonya hanya tersimpan di browser ini, bukan di Supabase.</p></div><button id="closeDemoProduct" type="button" class="close-modal"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="field"><label for="demoProductPhoto">Foto produk DEMO *</label><input id="demoProductPhoto" class="control" type="file" accept="image/jpeg,image/png,image/webp" required><small>JPG, PNG, atau WebP; maksimal 4 MB. Foto dikompres dan disimpan lokal.</small><img id="demoPhotoPreview" class="demo-photo-preview hidden" alt="Pratinjau foto DEMO"></div>
+      <div class="form-grid">
+        <div class="field"><label for="demoProductSku">SKU DEMO *</label><input id="demoProductSku" class="control" maxlength="50" required placeholder="DEMO-LOCAL-001"></div>
+        <div class="field"><label for="demoProductName">Nama produk *</label><input id="demoProductName" class="control" maxlength="150" required></div>
+        <div class="field"><label for="demoProductCategory">Kategori *</label><input id="demoProductCategory" class="control" maxlength="80" required></div>
+        <div class="field"><label for="demoProductUnit">Satuan *</label><input id="demoProductUnit" class="control" maxlength="20" required value="pcs"></div>
+        <div class="field"><label for="demoProductCost">Harga beli DEMO (Rp) *</label><input id="demoProductCost" class="control" type="number" min="0" step="0.01" required></div>
+        <div class="field"><label for="demoProductPrice">Harga jual DEMO (Rp) *</label><input id="demoProductPrice" class="control" type="number" min="0" step="0.01" required></div>
+        <div class="field"><label for="demoProductStock">Stok DEMO *</label><input id="demoProductStock" class="control" type="number" min="0" step="0.001" required value="0"></div>
+        <div class="field"><label for="demoProductMin">Batas minimum DEMO *</label><input id="demoProductMin" class="control" type="number" min="0" step="0.001" required value="5"></div>
+      </div>
+      <div id="demoProductError" class="error-box hidden" role="alert"></div>
+      <div class="modal-actions"><button id="cancelDemoProduct" type="button" class="btn-secondary">Batal</button><button type="submit" class="btn-primary">Simpan produk DEMO</button></div>
+    </form>
+  </dialog>
+  <script src="../js/demo-data.js"></script>
+  <script src="../js/demo.js"></script>
+</body>
+</html>

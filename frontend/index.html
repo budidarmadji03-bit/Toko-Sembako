@@ -1,13 +1,34 @@
 <!doctype html>
 <html lang="id">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="refresh" content="0; url=html/index.html">
-    <title>Toko Budi Sembako — Demo</title>
-  </head>
-  <body>
-    <p>Membuka aplikasi. Jika tidak berpindah otomatis, <a href="html/index.html">buka demo Toko Budi Sembako</a>.</p>
-    <script>window.location.replace("html/index.html");</script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f7fc">
+  <title>Toko Budi Sembako — Beranda</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
+  <link href="css/style.css" rel="stylesheet">
+</head>
+<body class="demo-preview-body">
+  <main class="home-landing">
+    <div class="brand-logo"><i class="fa-solid fa-basket-shopping"></i></div>
+    <span class="eyebrow">SISTEM PENJUALAN & PERSEDIAAN</span>
+    <h1>Toko Budi Sembako</h1>
+    <p class="home-landing-description">Pelanggan dapat memilih produk dan mengirim pesanan tanpa membuat akun. Pesanan masuk ke sistem Owner, stok direservasi, dan status dapat dilacak.</p>
+    <div class="home-landing-actions">
+      <a class="btn-primary" href="html/customer-guest.html"><i class="fa-solid fa-basket-shopping"></i> Belanja tanpa login</a>
+      <a class="btn-secondary" href="html/login.html"><i class="fa-solid fa-right-to-bracket"></i> Masuk Owner</a>
+      <a class="btn-secondary" href="html/login.html?mode=register"><i class="fa-solid fa-user-plus"></i> Login / daftar pelanggan</a>
+      <a class="btn-secondary" href="html/demo.html"><i class="fa-solid fa-eye"></i> Pratinjau laporan DEMO</a>
+    </div>
+    <div class="demo-preview-notice"><i class="fa-solid fa-circle-info"></i><span><strong>Pesanan tanpa login langsung terhubung ke sistem toko.</strong> Stok direservasi dan status pesanan terlihat oleh Owner. Pembayaran tidak diproses online; pesanan menunggu konfirmasi dan penyelesaian Owner.</span></div>
+  </main>
+  <script>
+    const authFlow = new URLSearchParams(location.hash.slice(1)).get("type");
+    if (authFlow === "invite" || authFlow === "recovery") {
+      location.replace(`html/login.html?flow=${authFlow}${location.hash}`);
+    }
+  </script>
+</body>
 </html>

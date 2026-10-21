@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#9333ea">
+  <title>Belanja Pelanggan DEMO — Toko Budi Sembako</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body class="customer-body">
+  <header class="customer-header">
+    <a class="customer-brand" href="../index.html"><span class="brand-logo"><i class="fa-solid fa-basket-shopping"></i></span><span><b>Toko Budi Sembako</b><small>Belanja Pelanggan DEMO</small></span></a>
+    <div class="customer-account"><span>Mode DEMO · tanpa login</span><a class="btn-secondary" href="../index.html">Kembali</a></div>
+  </header>
+  <main class="customer-content">
+    <section class="customer-welcome">
+      <div><span class="eyebrow">SIMULASI PELANGGAN · TANPA AKUN</span><h1>Coba pengalaman belanja pelanggan</h1><p>Pilih produk, isi detail pengantaran, lalu buat pesanan DEMO untuk melihat alur dan riwayatnya.</p></div>
+    </section>
+    <div class="demo-preview-notice"><i class="fa-solid fa-triangle-exclamation"></i><span><strong>Ini bukan akun atau transaksi toko.</strong> Produk, stok, keranjang, dan pesanan hanya simulasi di penyimpanan browser ini. Tidak ada data yang dikirim ke Supabase dan pesanan tidak akan diproses oleh toko.</span></div>
+    <div id="demoCustomerMessage" class="customer-message hidden" role="status" aria-live="polite"></div>
+    <section class="customer-columns">
+      <div>
+        <div class="toolbar customer-toolbar">
+          <label class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="demoCatalogSearch" type="search" placeholder="Cari nama atau kategori produk"></label>
+          <select id="demoCategoryFilter" class="control compact" aria-label="Filter kategori"><option value="">Semua kategori</option></select>
+        </div>
+        <div id="demoCatalog" class="customer-catalog"></div>
+        <section class="panel customer-orders">
+          <div class="panel-head"><div><h2>Riwayat pesanan DEMO</h2><p>Riwayat lokal simulasi, bukan pesanan sungguhan.</p></div><button id="clearDemoOrders" class="text-btn danger-text" type="button">Hapus riwayat DEMO</button></div>
+          <div id="demoOrders"></div>
+        </section>
+      </div>
+      <aside class="panel customer-cart">
+        <div class="panel-head"><div><h2>Keranjang DEMO</h2><p id="demoCartCount">0 produk</p></div><button id="clearDemoCart" class="text-btn danger-text" type="button">Kosongkan</button></div>
+        <div id="demoCartItems" class="customer-cart-items"></div>
+        <div class="field"><label for="demoRecipientName">Nama penerima *</label><input id="demoRecipientName" class="control" maxlength="120" required autocomplete="name"></div>
+        <div class="field"><label for="demoRecipientPhone">Nomor telepon *</label><input id="demoRecipientPhone" class="control" maxlength="40" required autocomplete="tel"></div>
+        <div class="field"><label for="demoDeliveryAddress">Alamat pengantaran *</label><textarea id="demoDeliveryAddress" class="control" rows="3" maxlength="400" required autocomplete="street-address"></textarea></div>
+        <div class="field"><label for="demoPaymentMethod">Metode pembayaran (simulasi)</label><select id="demoPaymentMethod" class="control"><option>Tunai saat pesanan diterima</option><option>Transfer (simulasi)</option><option>QRIS (simulasi)</option></select></div>
+        <div class="customer-total"><span>Total DEMO</span><b id="demoCartTotal">Rp0</b></div>
+        <button id="demoCheckoutButton" class="btn-primary" type="button" disabled><i class="fa-solid fa-truck-fast"></i> Buat pesanan DEMO</button>
+      </aside>
+    </section>
+  </main>
+  <div id="demoToast" class="toast" role="status" aria-live="polite"></div>
+  <script src="../js/demo-data.js"></script>
+  <script src="../js/customer-demo.js"></script>
+</body>
+</html>
