@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Uji laporan keuangan - Toko Budi Sembako</title>
+  <style>
+    body{max-width:900px;margin:32px auto;padding:0 16px;font:15px/1.6 system-ui,sans-serif;color:#243044}
+    li{margin:8px 0}.pass{color:#167a43}.fail{color:#b42318}code{background:#f1f3f7;padding:2px 5px}
+  </style>
+</head>
+<body>
+  <h1>Uji terisolasi modul laporan keuangan</h1>
+  <p>Data di halaman ini hanya fixture pengujian; tidak dikirim ke Supabase dan tidak digunakan oleh aplikasi produksi.</p>
+  <ol id="results"></ol>
+  <script src="../frontend/js/financial-reports.js"></script>
+  <script>
+    (() => {
+      "use strict";
+      const fixture = {
+        sales: [
+          { id: "paid", tanggal: "2026-07-15T17:15:00Z", status: "selesai", status_pembayaran: "lunas", subtotal: 1000, diskon: 100, total: 900, metode_pembayaran: "cash" },
+          { id: "cancelled", tanggal: "2026-07-16T12:00:00+07:00", status: "dibatalkan", status_pembayaran: "dikembalikan", subtotal: 400, diskon: 0, total: 400 },
+          { id: "partial", tanggal: "2026-07-16T13:00:00+07:00", status: "selesai", status_pembayaran: "sebagian", subtotal: 500, diskon: 0, total: 500 }
+        ],
+        purchases: [{ tanggal: "2026-07-16T09:00:00+07:00", total: 300 }],
+        expenses: [{ tanggal: "2026-07-16T09:00:00+07:00", nominal: 50 }],
+        stockMovements: [],
+        products: [
+          { id: "a", sku: "A", nama: "Barang A", kategori: "A", stok: 2, harga_beli: 200 },
+          { id: "b", sku: "B", nama: "Barang B", kategori: "B", stok: 3, harga_beli: 100 }
+        ],
+        saleItems: [
+          { penjualan_id: "paid", barang_id: "a", sku: "A", nama_barang: "Barang A", jumlah: 2, harga_satuan: 300, harga_pokok_satuan: 250, subtotal: 600 },
+          { penjualan_id: "paid", barang_id: "b", sku: "B", nama_barang: "Barang B", jumlah: 1, harga_satuan: 400, harga_pokok_satuan: 100, subtotal: 400 },
+          { penjualan_id: "cancelled", barang_id: "a", sku: "A", nama_barang: "Barang A", jumlah: 1, harga_satuan: 400, harga_pokok_satuan: 200, subtotal: 400 }
+        ],
+        customers: []
+      };
+      const run = (name, assertion) => {
+        const item = document.createElement("li");
+        try {
+          assertion();
+          item.className = "pass";
+          item.textContent = `LULUS — ${name}`;
+        } catch (error) {
+          item.className = "fail";
+          item.textContent = `GAGAL — ${name}: ${error.message}`;
+        }
+        document.querySelector("#results").append(item);
+      };
+      const equal = (actual, expected) => {
+        if (actual !== expected) throw new Error(`diharapkan ${expected}, diterima ${actual}`);
+      };
+      const api = window.RetailFinancialReports;
+      const period = { from: "2026-07-16", to: "2026-07-16" };
+      run("penjualan bruto, diskon, HPP, laba kotor, dan laba bersih", () => {
+        const model = api.makeModel(fixture, period);
+        equal(model.completed.length, 1);
+        equal(model.subtotal, 1000);
+        equal(model.discount, 100);
+        equal(model.netSales, 900);
+        equal(model.cogs, 600);
+        equal(model.grossProfit, 300);
+        equal(model.expenseTotal, 50);
+        equal(model.netProfit, 250);
+        equal(model.productTotals.reduce((total, row) => total + row.net, 0), model.netSales);
+      });
+      run("pembelian stok tidak ditambahkan sebagai beban", () => {
+        equal(api.makeModel(fixture, period).expenseTotal, 50);
+      });
+      run("pembatalan dikecualikan dan tetap dapat diaudit", () => {
+        const model = api.makeModel(fixture, period);
+        equal(model.cancelledCount, 1);
+        equal(model.netSales, 900);
+      });
+      run("pembayaran sebagian tidak diakui sebagai penjualan selesai", () => {
+        equal(api.makeModel(fixture, period).completed.length, 1);
+      });
+      run("tanggal transaksi mengikuti batas zona waktu Jakarta", () => {
+        const model = api.makeModel(fixture, { from: "2026-07-15", to: "2026-07-15" });
+        equal(model.sales.some(row => row.id === "paid"), false);
+      });
+      run("alokasi diskon kategori dan laba bersih tidak diklaim saat beban tak teralokasi", () => {
+        const model = api.makeModel(fixture, period, { category: "A" });
+        equal(model.netSales, 540);
+        equal(model.cogs, 500);
+        equal(model.grossProfit, 40);
+        equal(model.netProfit, null);
+      });
+      run("HPP tanpa snapshot historis ditandai belum tersedia", () => {
+        const data = { ...fixture, saleItems: fixture.saleItems.map(row =>
+          row.penjualan_id === "paid" ? { ...row, harga_pokok_satuan: null } : row
+        ) };
+        equal(api.makeModel(data, period).cogs, null);
+      });
+      run("total nota yang tidak cocok dengan subtotal dikurangi diskon ditolak", () => {
+        const data = { ...fixture, sales: fixture.sales.map(row =>
+          row.id === "paid" ? { ...row, total: 899 } : row
+        ) };
+        equal(api.makeModel(data, period).netSales, null);
+      });
+      run("periode tanpa transaksi menunjukkan nol aktual, bukan data contoh", () => {
+        const empty = { sales: [], purchases: [], expenses: [], stockMovements: [], products: [], saleItems: [], customers: [] };
+        const model = api.makeModel(empty, period);
+        equal(model.netSales, 0);
+        equal(model.cogs, 0);
+        equal(model.inventoryTotal, 0);
+      });
+      const accountNames = [
+        ["cash", "1010", "Kas", "asset", "debit", true],
+        ["bank", "1020", "Bank", "asset", "debit", true],
+        ["ar", "1030", "Piutang", "asset", "debit", false],
+        ["inventory", "1040", "Persediaan", "asset", "debit", false],
+        ["ap", "2010", "Utang pemasok", "liability", "credit", false],
+        ["refund", "2020", "Utang refund", "liability", "credit", false],
+        ["expensePayable", "2030", "Utang beban", "liability", "credit", false],
+        ["capital", "3010", "Modal", "equity", "credit", false],
+        ["retained", "3020", "Saldo laba", "equity", "credit", false],
+        ["drawings", "3030", "Prive", "equity", "debit", false],
+        ["sales", "4010", "Penjualan", "revenue", "credit", false],
+        ["discount", "4020", "Diskon", "contra_revenue", "debit", false],
+        ["adjustmentGain", "4030", "Penyesuaian persediaan", "revenue", "credit", false],
+        ["cogs", "5010", "HPP", "expense", "debit", false],
+        ["expense", "6010", "Beban", "expense", "debit", false],
+        ["stockLoss", "6020", "Kerugian stok", "expense", "debit", false]
+      ];
+      const accountingFixture = (() => {
+        const accounts = accountNames.map(([id, code, name, account_type, normal_balance, is_cash_equivalent]) =>
+          ({ id, code, name, account_type, normal_balance, is_cash_equivalent, is_active: true }));
+        const accountId = Object.fromEntries(accountNames.map(([id]) => [id, id]));
+        const entries = [
+          { id: "open", entry_date: "2026-10-26", cash_flow_activity: "noncash" },
+          { id: "sale", entry_date: "2026-10-26", cash_flow_activity: "operating" },
+          { id: "receipt", entry_date: "2026-10-26", cash_flow_activity: "operating" },
+          { id: "purchase", entry_date: "2026-10-26", cash_flow_activity: "operating" },
+          { id: "supplier-payment", entry_date: "2026-10-26", cash_flow_activity: "operating" },
+          { id: "expense", entry_date: "2026-10-26", cash_flow_activity: "operating" },
+          { id: "expense-payment", entry_date: "2026-10-26", cash_flow_activity: "operating" },
+          { id: "contribution", entry_date: "2026-10-26", cash_flow_activity: "financing" }
+        ];
+        const lines = [];
+        const add = (entry, code, debit, credit) =>
+          lines.push({ journal_entry_id: entry, account_id: accountId[code], debit, credit });
+        add("open", "cash", 1000, 0); add("open", "inventory", 500, 0); add("open", "capital", 0, 1500);
+        add("sale", "ar", 90, 0); add("sale", "discount", 10, 0); add("sale", "sales", 0, 100);
+        add("sale", "cogs", 40, 0); add("sale", "inventory", 0, 40);
+        add("receipt", "cash", 90, 0); add("receipt", "ar", 0, 90);
+        add("purchase", "inventory", 100, 0); add("purchase", "ap", 0, 100);
+        add("supplier-payment", "ap", 50, 0); add("supplier-payment", "cash", 0, 50);
+        add("expense", "expense", 20, 0); add("expense", "expensePayable", 0, 20);
+        add("expense-payment", "expensePayable", 10, 0); add("expense-payment", "bank", 0, 10);
+        add("contribution", "bank", 100, 0); add("contribution", "capital", 0, 100);
+        const payments = [
+          { id: "receipt-payment", kind: "customer_receipt", source_id: "sale", amount: 90, payment_method: "cash", cash_account_id: "cash", payment_date: "2026-10-26", journal_entry_id: "receipt" },
+          { id: "supplier-event", kind: "supplier_payment", source_id: "purchase", amount: 50, payment_method: "cash", cash_account_id: "cash", payment_date: "2026-10-26", journal_entry_id: "supplier-payment" },
+          { id: "expense-event", kind: "expense_payment", source_id: "expense", amount: 10, payment_method: "transfer", cash_account_id: "bank", payment_date: "2026-10-26", journal_entry_id: "expense-payment" }
+        ];
+        return {
+          settings: { cutover_date: "2026-10-26", opening_entry_id: "open" },
+          accounts, entries, lines, payments,
+          reconciliations: [{ account_id: "bank", statement_date: "2026-10-26", statement_balance: 90 }],
+          products: [{ stok: 56, harga_beli: 10 }], sales: [], saleItems: []
+        };
+      })();
+      const accountingSource = { ...accountingFixture, accounting: accountingFixture };
+      run("jurnal kasir, pembelian kredit, beban, dan modal menghasilkan arus kas serta neraca seimbang", () => {
+        const model = api.makeAccountingModel(accountingSource, { from: "2026-10-26", to: "2026-10-26" });
+        equal(model.allBalanced, true);
+        equal(model.openingCash, 1000);
+        equal(model.cashEnding, 1130);
+        equal(model.netCashChange, 130);
+        equal(model.activityRows.find(row => row.activity === "operating").inflow, 90);
+        equal(model.activityRows.find(row => row.activity === "operating").outflow, 60);
+        equal(model.activityRows.find(row => row.activity === "financing").inflow, 100);
+        equal(model.assetTotal, 1690);
+        equal(model.liabilityTotal, 60);
+        equal(model.equityTotal, 1630);
+        equal(model.balanceDifference, 0);
+        equal(model.paymentPostingDifference, 0);
+        equal(model.inventoryLedger, 560);
+        equal(model.profitAndLossRows.reduce((total, row) => total + row.amount, 0), 30);
+      });
+      run("jurnal tidak seimbang terdeteksi tanpa membuat akun penyeimbang", () => {
+        const altered = { ...accountingFixture, lines: accountingFixture.lines.filter(line =>
+          !(line.journal_entry_id === "expense-payment" && line.account_id === "bank")
+        ) };
+        const data = { ...altered, accounting: altered };
+        const model = api.makeAccountingModel(data, { from: "2026-10-26", to: "2026-10-26" });
+        equal(model.allBalanced, false);
+      });
+      run("neraca tanpa saldo awal tetap ditandai belum lengkap", () => {
+        const altered = { ...accountingFixture, settings: { ...accountingFixture.settings, opening_entry_id: null } };
+        const data = { ...altered, accounting: altered };
+        const model = api.makeAccountingModel(data, { from: "2026-10-26", to: "2026-10-26" });
+        equal(model.hasOpening, false);
+        equal(model.openingCash, null);
+        equal(model.cashEnding, null);
+      });
+    })();
+  </script>
+</body>
+</html>

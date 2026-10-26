@@ -30,7 +30,7 @@ Login Owner dan Pelanggan menggunakan Supabase Auth dan role dari `public.profil
 - **Kasir:** membuat keranjang penjualan, memilih pelanggan, menerapkan diskon, memilih metode pembayaran, dan memvalidasi pembayaran serta kembalian.
 - **Cetak nota:** Owner dapat mencetak nota dari dashboard dan riwayat penjualan; pelanggan dapat mencetak nota dari riwayat pesanan. Nota memuat detail barang, nominal, status, serta alamat/tanggal pengiriman bila tersedia.
 - **Pelanggan:** melihat, mencari, menambah, mengubah, dan menghapus data pelanggan.
-- **Laporan usaha:** menyaring periode dan melihat laba rugi operasional, penjualan per barang setelah alokasi diskon, metode pembayaran, beban per kategori, pembelian, mutasi stok, dan valuasi persediaan saat ini. Ekspor Excel memiliki lembar terpisah untuk rincian laporan tersebut.
+- **Laporan usaha:** laporan Owner menyediakan filter periode, laba rugi jurnal, arus kas, neraca, rekonsiliasi, rincian transaksi, valuasi stok, dan cetak. Saldo awal harus diverifikasi dan dimasukkan Owner sebelum saldo kas/neraca dianggap lengkap. Ekspor laporan dan paket tersedia sebagai CSV atau `.xlsx`.
 - **Ekspor:** mengunduh data persediaan dan pelanggan serta laporan sebagai CSV atau Excel (`.xlsx`).
 - **Pembatalan transaksi:** pembatalan penjualan kasir memulihkan stok melalui RPC; pesanan antar memakai alur penolakan/kegagalan sendiri agar stok tidak dipulihkan dua kali.
 - **Login dua role:** autentikasi Supabase Auth, pembacaan role dari `public.profiles`, pengalihan dashboard Owner/portal Pelanggan, registrasi yang selalu membuat role `customer`, dan logout.
@@ -41,19 +41,24 @@ Login Owner dan Pelanggan menggunakan Supabase Auth dan role dari `public.profil
 
 ## Logika Akuntansi
 
-- **Penjualan bersih** dihitung dari total transaksi selesai. Transaksi yang dibatalkan tidak dihitung sebagai penjualan.
-- **HPP (Harga Pokok Penjualan)** dijumlahkan berdasarkan snapshot biaya barang pada detail transaksi. Biaya persediaan diperbarui dengan metode rata-rata tertimbang bergerak saat stok masuk; transaksi lama tanpa snapshot HPP tetap memerlukan peninjauan dan tidak boleh dianggap sebagai nilai historis yang pasti.
-- **Laba kotor** = penjualan bersih − HPP.
-- **Laba bersih** = laba kotor − beban operasional yang dicatat.
-- **Pembelian stok** dilaporkan sebagai pembelian persediaan, bukan langsung sebagai beban laba rugi. Ringkasan arus kas saat ini mengasumsikan seluruh stok masuk dibayar langsung; karena status tunai/kredit belum dicatat, angka tersebut bukan laporan arus kas yang andal untuk transaksi kredit atau pembayaran sebagian.
-- **Arus kas bersih sederhana** saat ini = penerimaan penjualan − nilai pembelian stok − beban operasional, dengan asumsi pembayaran tunai saat transaksi.
-- Diskon ditampilkan terpisah dari ringkasan penjualan. Catat beban operasional agar perhitungan laba bersih mencerminkan biaya yang dimasukkan.
+- Terapkan migrasi `backend/sql/09_accounting_ledger.sql` setelah migrasi 01–08. Migrasi menambahkan COA, jurnal dan baris debit-kredit, pencatatan pembayaran, saldo awal, dan rekonsiliasi. Jurnal immutable dan harus seimbang; fungsi tulis dibatasi ke Owner.
+- **Cutover:** default tanggal 26 Oktober 2026. Transaksi historis tidak direkonstruksi karena data penyelesaian pembayaran dan saldo pembukaan tidak tersedia. Data lama tidak dihapus atau diberi metode pembayaran/utang rekaan. Kolom pembayaran pembelian/beban lama tetap `NULL` (belum diketahui); transaksi tersebut tidak dapat dilunasi melalui ledger tanpa bukti saldo.
+- **Saldo awal:** setelah migrasi, buka Laporan → **Saldo awal** dan masukkan nilai kas, bank, persediaan, piutang, utang, dan ekuitas yang didukung dokumen. Debit harus sama dengan kredit; sistem tidak membuat akun penyeimbang. Neraca dan saldo kas tetap berstatus belum lengkap bila saldo awal belum dicatat.
+- **Penjualan selesai:** jurnal akrual mencatat piutang, penjualan bruto, diskon, HPP snapshot, dan pengurangan persediaan. Pembayaran kasir dicatat terpisah dari penjualan kredit. Pesanan antar diakui sebagai penjualan saat statusnya selesai, tetapi tidak otomatis dianggap lunas. Catat penerimaan piutang secara terpisah. Pembatalan setelah cutover membuat jurnal balik; refund yang belum dibayar tercatat sebagai utang refund.
+- **Pembelian dan beban:** stok masuk mendebit persediaan dan mengkredit utang pemasok; beban mendebit beban dan mengkredit utang beban. Isian **Dibayar sekarang** mencatat pembayaran kas/bank; sisanya dapat dibayar kemudian. Harga stok wajib positif dan transaksi yang sudah dijurnal tidak dapat dihapus; koreksi memerlukan jurnal manual.
+- **Pembayaran digital:** kebijakan cutover mencatat transfer, QRIS, dan kartu debit langsung ke Bank pada tanggal transaksi. Ini mengasumsikan pencairan hari yang sama; cocokkan dengan rekening koran dan masukkan saldo aktual di **Rekonsiliasi kas/bank**. Arus kas dihitung dari mutasi akun Kas/Bank dalam jurnal, bukan dari nilai penjualan atau pembelian kredit.
+- **Persediaan:** produk baru dimulai dengan stok nol; impor CSV dengan stok awal nonnol ditolak. Masukkan nilai awal yang diverifikasi pada saldo awal atau catat sebagai transaksi stok masuk. Setelah saldo awal dicatat, biaya rata-rata barang yang masih memiliki stok tidak dapat diubah langsung; perubahan biaya harus melalui stok masuk atau jurnal koreksi. Stok masuk, HPP penjualan, pembatalan, dan penyesuaian memengaruhi akun persediaan. Selisih stok dan buku ditampilkan; tidak dibuat jurnal penyeimbang palsu.
+- COA standar meliputi Kas, Bank, Piutang, Persediaan, Utang pemasok/refund/beban, Modal, Saldo laba awal, Prive, Penjualan, Diskon, HPP, Beban, dan penyesuaian stok. Jurnal manual dapat mencatat modal/prive dan koreksi berbukti. Belum ada pajak, aset tetap/depresiasi, banyak gudang, atau alur retur penjualan terstruktur.
+- Laba rugi akuntansi memakai jurnal setelah cutover; ringkasan operasional historis tetap terpisah. Laporan ini tidak menggantikan rekonsiliasi rutin, verifikasi saldo awal, pembukuan resmi, atau pelaporan pajak.
 
-Perhitungan ini merupakan ringkasan operasional sederhana, bukan sistem akuntansi double-entry. Pencatatan pembelian dan arus kas saat ini tidak membedakan pembelian tunai/kredit maupun pembayaran sebagian. Jangan gunakan laporan tersebut sebagai laporan keuangan final atau pengganti pembukuan resmi/pelaporan pajak sebelum modul akuntansi dan kontrol akses selesai.
+Filter tanggal dan jurnal memakai zona waktu `Asia/Jakarta`; pertumbuhan volume data besar perlu diikuti agregasi server-side. Neraca memakai saldo jurnal hingga tanggal akhir. Nilai persediaan operasional menggunakan biaya tercatat kini; perbandingan buku dengan stok barang hanya dapat dilakukan terhadap jumlah terkini karena tidak tersedia snapshot nilai stok historis.
 
-Impor barang memakai template yang diunduh dari halaman Persediaan. Isi harga dan saldo stok berdasarkan data yang benar sebelum impor; sistem memvalidasi semua baris dan SKU terlebih dahulu, membatasi 500 produk per berkas, lalu meminta konfirmasi sebelum mengirim ke Supabase. Data awal produk akan menghasilkan mutasi saldo awal sesuai trigger database.
+### Ekspor dan uji laporan
 
-Laporan mutasi persediaan dibatasi tanggal laporan. Laporan valuasi persediaan selalu memakai saldo dan biaya rata-rata tercatat saat ini, bukan rekonstruksi saldo historis. Laporan usaha belum mencakup neraca, saldo awal akuntansi, utang/piutang, aset tetap, pajak, atau jurnal double-entry; jangan menganggapnya laporan keuangan lengkap atau klaim kepatuhan PSAK.
+- Tombol **Ekspor laporan (.xlsx)** mengekspor bagian laporan aktif dengan filter aktif. **Ekspor paket (.xlsx)** membuat worksheet `Ringkasan`, `Laba Rugi`, `Arus Kas`, `Neraca`, `Persediaan`, `Pembelian Stok`, `Penjualan`, `Beban Operasional`, `Pembayaran`, `Rekonsiliasi`, dan `Metadata`. Angka mengikuti model yang sama dengan UI; pembayaran historis yang tidak diketahui ditandai, bukan dianggap nol.
+- File memakai `xlsx-js-style` melalui CDN; ekspor membutuhkan library tersebut dan koneksi yang dapat memuatnya. Workbook memberi format judul/header, mata uang, lebar kolom, dan filter otomatis; tidak ada formula spreadsheet yang dibentuk dari input pengguna.
+- Jalankan uji fixture tanpa database melalui `tests/financial-reports.html`; fixture tidak dikirim ke Supabase. Uji meliputi perhitungan operasional, jurnal, arus kas, neraca, selisih, dan saldo awal yang hilang.
+- QA staging yang masih wajib: uji migrasi pada Supabase staging, hak akses Owner/customer, jurnal tak seimbang, pembayaran tunai/digital dan bertahap, pembelian/beban tunai-kredit, pembayaran utang, refund, rekonsiliasi bank dan stok, serta ekspor dengan Excel. Jangan membuat transaksi uji pada data produksi.
 
 ## ERD Inti (3 Entitas)
 
@@ -100,6 +105,8 @@ erDiagram
 ├── .github/
 │   └── workflows/
 │       └── deploy-pages.yml   # Publikasi demo ke GitHub Pages
+├── tests/
+│   └── financial-reports.html # Uji model laporan dengan fixture terisolasi
 ├── backend/
 │   └── sql/
 │       ├── 01_schema.sql      # Tabel, relasi, indeks, dan kebijakan database
@@ -125,6 +132,7 @@ erDiagram
 │       ├── customer-guest.js  # Checkout tamu, reservasi stok, dan pelacakan berkode
 │       ├── config.js          # Project URL dan publishable/anon key publik
 │       ├── supabase-auth.js   # Supabase Auth, pemuatan profil, dan role check
+│       ├── financial-reports.js # Perhitungan/filter laporan Owner dan ekspor workbook
 │       └── login.js           # Validasi form, status, error, dan redirect role
 └── README.md
 ```
@@ -134,11 +142,13 @@ erDiagram
 - HTML5, CSS3, dan JavaScript tanpa framework/build step.
 - Supabase JavaScript SDK v2 melalui CDN untuk Auth, PostgreSQL REST/RPC, dan Storage; sesi dikelola dan diperiksa ulang oleh SDK.
 - Row Level Security membatasi data operasional kepada Owner dan data profil/pesanan milik Pelanggan.
-- SheetJS Community Edition untuk membuat file Excel `.xlsx`.
+- `xlsx-js-style` (CDN versi terkunci, API kompatibel SheetJS) untuk membuat workbook `.xlsx` dengan format sel.
 - GitHub Pages dan GitHub Actions untuk menerbitkan demo statis.
 - Font Awesome, Google Fonts, dan Unsplash untuk ikon, tipografi, serta gambar.
 
 ## Menjalankan Secara Lokal
+
+Untuk mengaktifkan arus kas dan neraca, siapkan backup dan jalankan `backend/sql/09_accounting_ledger.sql` di Supabase SQL Editor setelah migrasi 01–08. Sebelum menerapkan, pastikan `cutover_date` default `2026-10-26` sesuai tanggal mulai pembukuan yang disetujui; bila tidak, ubah tanggal pada migrasi sebelum menjalankannya. Uji dulu di proyek staging. Setelah migrasi, login sebagai Owner dan masukkan saldo awal terverifikasi sebelum mengandalkan saldo laporan.
 
 1. Sajikan folder `frontend` lewat HTTPS atau localhost (misalnya VS Code Live Server). Jangan membuka HTML langsung dengan `file://`.
 2. Di Supabase Dashboard, buka **Project Settings → API**. Konfigurasi `projectUrl` dan `publishableKey` di `frontend/js/config.js` dengan project URL dan publishable/anon key. Nilai ini memang publik untuk browser; jangan gunakan `service_role` atau secret key. `.env.example` hanya dokumentasi placeholder—GitHub Pages statis tidak memuat `.env`.

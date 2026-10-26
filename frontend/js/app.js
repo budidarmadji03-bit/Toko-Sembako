@@ -46,6 +46,7 @@ function renderWelcomeProducts(){
  display.innerHTML=showcase.map(p=>`<div class="welcome-product">${productImage(p)}</div>`).join("");
 }
 let products=[],customers=[],sales=[],saleItems=[],purchases=[],expenses=[],stockMovements=[],cart=[],toastTimer;
+let accountingData={error:"Migrasi backend/sql/09_accounting_ledger.sql belum diterapkan."};
 function db(){return window.RetailConfig.getClient();}
 async function checked(result){
  const {data,error}=await result;
@@ -64,8 +65,10 @@ function toast(msg,error=false){const e=$("#toast");e.textContent=msg;e.classNam
 function empty(title,desc){return `<div class="empty"><i class="fa-solid fa-box-open"></i><b>${title}</b><p>${desc}</p></div>`}
 function statusConnection(connected=true){const status=$("#connectionStatus");status.textContent=connected?"Terhubung ke Supabase":"Supabase tidak terhubung";status.style.color=connected?"#16a34a":"#dc2626";const label=$("#connectionLabel");if(label)label.innerHTML=`<i class="fa-solid ${connected?"fa-cloud":"fa-triangle-exclamation"}"></i><b>${connected?"Supabase":"Koneksi gagal"}</b>`;}
 async function loadData(){
- const client=db();
- const [productRows,customerRows,saleRows,detailRows,purchaseRows,expenseRows,stockRows]=await Promise.all([
+ window.RetailFinancialReports?.setLoading();
+ let client;
+ try{client=db()}catch(error){window.RetailFinancialReports?.setError(error.message);throw error}
+ const operationalData=Promise.all([
   fetchAll(client.from("barang").select("*").order("nama")),
   fetchAll(client.from("pelanggan").select("*").order("nama")),
   fetchAll(client.from("penjualan").select("*").order("tanggal",{ascending:false})),
@@ -74,6 +77,23 @@ async function loadData(){
   fetchAll(client.from("beban_operasional").select("*").order("tanggal",{ascending:false})),
   fetchAll(client.from("mutasi_persediaan").select("*").order("tanggal",{ascending:false}))
  ]);
+ const accountingRequest=Promise.all([
+  checked(client.from("accounting_settings").select("*").eq("id",true).single()),
+  fetchAll(client.from("chart_of_accounts").select("*").order("code")),
+  fetchAll(client.from("journal_entries").select("*").order("entry_date").order("id")),
+  fetchAll(client.from("journal_lines").select("*").order("id")),
+  fetchAll(client.from("accounting_payments").select("*").order("payment_date").order("id")),
+  fetchAll(client.from("account_reconciliations").select("*").order("statement_date",{ascending:false}).order("id"))
+ ]).then(([settings,accounts,entries,lines,payments,reconciliations])=>({
+  settings,accounts,entries,lines,payments,reconciliations,error:""
+ })).catch(error=>({
+  settings:null,accounts:[],entries:[],lines:[],payments:[],reconciliations:[],
+  error:`Akuntansi belum tersedia: ${error.message||"migrasi atau akses Owner belum siap."}`
+ }));
+ const [rows,accounting]=await Promise.all([operationalData,accountingRequest])
+  .catch(error=>{window.RetailFinancialReports?.setError(error.message);throw error});
+ const [productRows,customerRows,saleRows,detailRows,purchaseRows,expenseRows,stockRows]=rows;
+ accountingData=accounting;
  products=productRows;
  customers=customerRows;
  saleItems=detailRows;
@@ -85,6 +105,7 @@ async function loadData(){
  expenses=expenseRows;
  stockMovements=stockRows;
  statusConnection(true);
+ window.RetailFinancialReports?.clearError();
  renderAll();
 }
 function renderAll(){renderDashboard();renderProducts();renderSaleProducts();renderCustomers();renderSalesReport();renderDeliveryOrders();populateCustomers();populateStockInProducts();renderCart();renderWelcomeProducts();}
@@ -92,6 +113,7 @@ function populateStockInProducts(){const s=$("#stockInProduct");if(!s)return;con
 function page(name){$$(".page").forEach(p=>p.classList.toggle("hidden",p.id!=="page-"+name));$$(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===name));$("#breadcrumb").textContent=({dashboard:"Dashboard",inventory:"Persediaan Barang",sales:"Penjualan / Kasir",delivery:"Pesanan Antar",customers:"Pelanggan",reports:"Laporan Keuangan"})[name]||"Dashboard";$("#sidebar").classList.remove("open");$("#scrim").classList.remove("show");if(name==="sales")renderSaleProducts();if(name==="delivery")renderDeliveryOrders();}
 function productValue(p){return Number(p.stok||0)*Number(p.harga_beli||0)}
 function todayISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+function requestKey(){if(globalThis.crypto?.randomUUID)return globalThis.crypto.randomUUID();if(!globalThis.crypto?.getRandomValues)throw new Error("Browser tidak menyediakan generator acak aman untuk mencegah pembayaran ganda.");const bytes=globalThis.crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;const hex=Array.from(bytes,value=>value.toString(16).padStart(2,"0")).join("");return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`}
 function dateKey(value){if(!value)return"";const text=String(value);if(/^\d{4}-\d{2}-\d{2}$/.test(text))return text;const date=new Date(text);if(Number.isNaN(date.getTime()))return text.slice(0,10);return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`}
 function activeProducts(){return products.filter(p=>p.aktif!==false)}
 function salesToday(){return sales.filter(s=>dateKey(s.tanggal||s.created_at)===todayISO()&&s.status==="selesai")}
@@ -226,9 +248,15 @@ function stockMovementRows(){
 }
 function reportTable(rows,headers,renderRow,emptyTitle,emptyDescription){return rows.length?`<table class="data-table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.map(renderRow).join("")}</tbody></table>`:empty(emptyTitle,emptyDescription)}
 function renderSalesReport(){
+ if(window.RetailFinancialReports){
+  window.RetailFinancialReports.render({sales,purchases,expenses,stockMovements,products,saleItems,customers,accounting:accountingData});
+  return;
+ }
+ $("#reportCashflow").textContent="Tidak tersedia";
  const rows=reportRows(),valid=completedSales(rows),purchasesInPeriod=reportPurchases(),expensesInPeriod=reportExpenses();
  const revenue=valid.reduce((sum,s)=>sum+Number(s.total||0),0),saleCosts=valid.map(saleCost),costsComplete=saleCosts.every(cost=>cost!==null),cogs=costsComplete?saleCosts.reduce((sum,cost)=>sum+cost,0):null,gross=cogs===null?null:revenue-cogs,expenseTotal=expensesInPeriod.reduce((sum,x)=>sum+Number(x.nominal||0),0),purchaseTotal=purchasesInPeriod.reduce((sum,p)=>sum+Number(p.total||Number(p.jumlah||0)*Number(p.harga_satuan||0)),0),net=gross===null?null:gross-expenseTotal;
  $("#legacyCostNotice").classList.toggle("hidden",costsComplete);$("#reportCount").textContent=valid.length;$("#reportRevenue").textContent=money(revenue);$("#reportCost").textContent=cogs===null?"Data belum lengkap":money(cogs);$("#reportGrossProfit").textContent=gross===null?"Data belum lengkap":money(gross);$("#reportExpenses").textContent=money(expenseTotal);$("#reportNetProfit").textContent=net===null?"Data belum lengkap":money(net);$("#reportPurchases").textContent=money(purchaseTotal);$("#reportCashflow").textContent=money(revenue-purchaseTotal-expenseTotal);$("#reportDiscount").textContent=money(valid.reduce((sum,s)=>sum+Number(s.diskon||0),0));
+ $("#reportCashflow").textContent="Tidak tersedia";
  $("#incomeStatement").innerHTML=reportTable([
   {label:"Penjualan sebelum diskon",amount:valid.reduce((sum,s)=>sum+Number(s.subtotal||0),0)},
   {label:"Diskon penjualan",amount:-valid.reduce((sum,s)=>sum+Number(s.diskon||0),0)},
@@ -361,6 +389,7 @@ function parseProductCsv(text){
   if(!product.sku||product.sku.length>50)throw Error(`Baris ${line}: SKU wajib diisi dan maksimal 50 karakter.`);
   if(!product.nama||product.nama.length>150||!product.kategori||!product.satuan)throw Error(`Baris ${line}: nama, kategori, dan satuan wajib diisi.`);
   if([product.harga_beli,product.harga_jual,product.stok,product.stok_minimum].some(value=>!Number.isFinite(value)||value<0))throw Error(`Baris ${line}: harga dan stok harus berupa angka nol atau lebih.`);
+  if(product.stok!==0)throw Error(`Baris ${line}: stok awal CSV harus 0. Catat stok melalui saldo awal terverifikasi atau transaksi stok masuk.`);
   const key=product.sku.toLowerCase();if(skuSet.has(key))throw Error(`Baris ${line}: SKU "${product.sku}" sudah ada atau berulang.`);
   skuSet.add(key);return product;
  });
@@ -385,6 +414,8 @@ async function saveProduct(e){
  let uploaded=null,productSaved=false;
  try{
   const values=productFormData(),id=$("#productId").value,current=products.find(p=>String(p.id)===String(id));
+  if(!id&&values.stok!==0)throw Error("Barang baru harus dibuat dengan stok 0. Catat jumlah barang melalui stok masuk atau saldo awal terverifikasi.");
+  if(current&&Number(current.stok)>0&&accountingData.settings?.opening_entry_id&&Number(values.harga_beli)!==Number(current.harga_beli))throw Error("Biaya rata-rata barang dengan stok tidak dapat diubah langsung setelah saldo awal dicatat. Catat stok masuk atau jurnal koreksi.");
   if(products.some(p=>p.sku.toLowerCase()===values.sku.toLowerCase()&&String(p.id)!==String(id)))throw Error("SKU sudah digunakan.");
   let fotoUrl=removeProductPhoto?null:current?.foto_url||null;
   if(pendingProductPhoto&&pendingProductPhoto!==current?.foto_url){
@@ -416,22 +447,147 @@ async function saveProduct(e){
 }
 function openCustomer(c=null){$("#customerForm").reset();$("#customerError").classList.add("hidden");$("#customerId").value=c?c.id:"";$("#customerModalTitle").textContent=c?"Edit pelanggan":"Tambah pelanggan";if(c){$("#customerName").value=c.nama;$("#customerPhone").value=c.telepon||"";$("#customerAddress").value=c.alamat||""}$("#customerDialog").showModal()}
 async function saveCustomer(e){e.preventDefault();try{const d={nama:$("#customerName").value.trim(),telepon:$("#customerPhone").value.trim()||null,alamat:$("#customerAddress").value.trim()||null},id=$("#customerId").value;if(!d.nama)throw Error("Nama pelanggan wajib diisi.");if(id)await checked(db().from("pelanggan").update(d).eq("id",id));else await checked(db().from("pelanggan").insert(d));await loadData();$("#customerDialog").close();toast("Data pelanggan disimpan.")}catch(err){$("#customerError").textContent=err.message;$("#customerError").classList.remove("hidden")}}
-function openExpense(){const form=$("#expenseForm");form.reset();$("#expenseError").classList.add("hidden");$("#expenseDate").value=todayISO();$("#expenseDialog").showModal()}
+function openExpense(){const form=$("#expenseForm");form.reset();$("#expenseError").classList.add("hidden");$("#expenseDate").value=todayISO();$("#expensePaidAmount").value=0;$("#expenseRequestKey").value=requestKey();$("#expenseDialog").showModal()}
 async function saveExpense(e){
  e.preventDefault();
  const date=$("#expenseDate").value,category=$("#expenseCategory").value,description=$("#expenseDescription").value.trim(),amount=Number($("#expenseAmount").value);
  try{
-  if(!date||!category||!description||!Number.isFinite(amount)||amount<=0)throw Error("Lengkapi tanggal, kategori, keterangan, dan nominal beban.");
-  const record={tanggal:new Date(`${date}T12:00:00`).toISOString(),kategori:category,keterangan:description,nominal:amount};
-  await checked(db().from("beban_operasional").insert(record));await loadData();
+  const paidAmount=Number($("#expensePaidAmount").value),paymentMethod=$("#expensePaymentMethod").value;
+  if(!date||!category||!description||!Number.isFinite(amount)||amount<=0||!Number.isFinite(paidAmount)||paidAmount<0||paidAmount>amount)throw Error("Lengkapi tanggal, kategori, keterangan, nominal, serta pembayaran antara Rp0 dan total beban.");
+  await checked(db().rpc("record_operational_expense",{
+   p_date:date,p_category:category,p_description:description,p_amount:amount,
+   p_paid_amount:paidAmount,p_payment_method:paymentMethod,p_request_key:$("#expenseRequestKey").value
+  }));await loadData();
   $("#expenseDialog").close();toast("Beban operasional berhasil dicatat.");
  }catch(err){$("#expenseError").textContent=err.message||"Gagal menyimpan beban operasional.";$("#expenseError").classList.remove("hidden");}
 }
 async function deleteExpense(id){
- if(!confirm("Hapus catatan beban operasional ini?"))return;
- try{await checked(db().from("beban_operasional").delete().eq("id",id));await loadData();
- toast("Catatan beban dihapus.");
- }catch(err){toast("Tidak dapat menghapus beban: "+err.message,true)}
+ toast("Catatan beban yang sudah dijurnal tidak dapat dihapus. Buat jurnal koreksi agar riwayat tetap dapat diaudit.",true);
+}
+function openAccountingPayment(kind,sourceId,balance){
+ const definitions={
+  customer_receipt:["Catat pembayaran piutang","Pembayaran pelanggan masuk ke Kas atau Bank."],
+  customer_refund:["Catat pengembalian dana","Pembayaran refund mengurangi utang pengembalian pelanggan."],
+  supplier_payment:["Bayar utang pemasok","Pembayaran mengurangi utang pemasok dan saldo Kas/Bank."],
+  expense_payment:["Bayar utang beban","Pembayaran mengurangi utang beban operasional."]
+ };
+ const [title,description]=definitions[kind]||[];
+ if(!title||!sourceId||!Number.isFinite(Number(balance))||Number(balance)<=0)return;
+ $("#accountingPaymentTitle").textContent=title;
+ $("#accountingPaymentDescription").textContent=description;
+ $("#accountingPaymentKind").value=kind;
+ $("#accountingPaymentSource").value=sourceId;
+ $("#accountingPaymentDate").value=todayISO();
+ $("#accountingPaymentRequestKey").value=requestKey();
+ $("#accountingPaymentAmount").value=Number(balance).toFixed(2);
+ $("#accountingPaymentAmount").max=Number(balance).toFixed(2);
+ $("#accountingPaymentMethod").value="cash";
+ $("#accountingPaymentError").classList.add("hidden");
+ $("#accountingPaymentDialog").showModal();
+}
+async function submitAccountingPayment(event){
+ event.preventDefault();
+ const kind=$("#accountingPaymentKind").value,sourceId=$("#accountingPaymentSource").value;
+ const amount=Number($("#accountingPaymentAmount").value),date=$("#accountingPaymentDate").value;
+ const method=$("#accountingPaymentMethod").value;
+ const error=$("#accountingPaymentError"),button=event.submitter;
+ error.classList.add("hidden");if(button)button.disabled=true;
+ try{
+  if(!date||!Number.isFinite(amount)||amount<=0||amount>Number($("#accountingPaymentAmount").max))throw Error("Tanggal atau nominal pembayaran tidak valid.");
+  if(kind==="customer_receipt")await checked(db().rpc("record_customer_payment",{p_sale_id:sourceId,p_amount:amount,p_payment_method:method,p_payment_date:date,p_request_key:$("#accountingPaymentRequestKey").value}));
+  else if(kind==="customer_refund")await checked(db().rpc("record_customer_refund",{p_sale_id:sourceId,p_amount:amount,p_payment_method:method,p_payment_date:date,p_request_key:$("#accountingPaymentRequestKey").value}));
+  else await checked(db().rpc("record_supplier_or_expense_payment",{p_kind:kind,p_source_id:sourceId,p_amount:amount,p_payment_method:method,p_payment_date:date,p_request_key:$("#accountingPaymentRequestKey").value}));
+  await loadData();$("#accountingPaymentDialog").close();toast("Pembayaran dan jurnal berhasil dicatat.");
+ }catch(err){error.textContent=err.message||"Pembayaran gagal dicatat.";error.classList.remove("hidden");}
+ finally{if(button)button.disabled=false}
+}
+function accountingSelectOptions(accounts,selected=""){
+ return accounts.filter(account=>account.is_active).map(account=>`<option value="${esc(account.code)}"${account.code===selected?" selected":""}>${esc(account.code)} — ${esc(account.name)}</option>`).join("");
+}
+function accountingLineRow(accounts,opening=false){
+ if(opening){
+  return `<div class="accounting-line"><b class="accounting-account">${esc(accounts.code)} — ${esc(accounts.name)}</b><input class="control" type="number" min="0" step="0.01" data-opening-debit aria-label="Debit ${esc(accounts.name)}" placeholder="Debit"><input class="control" type="number" min="0" step="0.01" data-opening-credit aria-label="Kredit ${esc(accounts.name)}" placeholder="Kredit"></div>`;
+ }
+ return `<div class="accounting-line" data-manual-line><select class="control" data-manual-account required><option value="">Pilih akun</option>${accountingSelectOptions(accounts)}</select><input class="control" type="number" min="0" step="0.01" data-manual-debit aria-label="Debit" placeholder="Debit"><input class="control" type="number" min="0" step="0.01" data-manual-credit aria-label="Kredit" placeholder="Kredit"><button type="button" class="table-action danger" data-remove-journal-line aria-label="Hapus baris">×</button></div>`;
+}
+function setupAccountingTools(){
+ $("#openOpeningBalances").addEventListener("click",()=>{
+  if(accountingData.error||accountingData.settings?.opening_entry_id)return;
+  const date=accountingData.settings.cutover_date;
+  $("#openingBalancesDate").textContent=`Tanggal saldo awal: ${date}. Masukkan saldo yang sudah diperiksa.`;
+  $("#openingBalanceLines").innerHTML=accountingData.accounts
+   .filter(account=>account.is_active&&["asset","liability","equity"].includes(account.account_type))
+   .map(account=>accountingLineRow(account,true)).join("");
+  $("#openingBalanceError").classList.add("hidden");$("#openingBalancesDialog").showModal();
+ });
+ $("#openingBalancesForm").addEventListener("submit",async event=>{
+  event.preventDefault();const error=$("#openingBalanceError"),button=event.submitter;
+  error.classList.add("hidden");if(button)button.disabled=true;
+  try{
+   const lines=[...$("#openingBalanceLines").querySelectorAll(".accounting-line")].map(row=>({
+    account_code:row.querySelector(".accounting-account").textContent.split(" — ")[0],
+    debit:Number(row.querySelector("[data-opening-debit]").value||0),
+    credit:Number(row.querySelector("[data-opening-credit]").value||0)
+   })).filter(line=>line.debit||line.credit);
+   const debit=lines.reduce((total,line)=>total+line.debit,0),credit=lines.reduce((total,line)=>total+line.credit,0);
+   if(lines.length<2||debit<=0||Math.abs(debit-credit)>0.005)throw Error(`Saldo awal harus seimbang. Debit ${money(debit)}; kredit ${money(credit)}. Tidak ada nilai penyeimbang otomatis.`);
+   await checked(db().rpc("set_accounting_opening_balances",{p_lines:lines}));
+   await loadData();$("#openingBalancesDialog").close();toast("Saldo awal terverifikasi berhasil dijurnal.");
+  }catch(err){error.textContent=err.message||"Saldo awal gagal disimpan.";error.classList.remove("hidden");}
+  finally{if(button)button.disabled=false}
+ });
+ const addManualLine=()=>$("#manualJournalLines").insertAdjacentHTML("beforeend",accountingLineRow(accountingData.accounts));
+ $("#openManualJournal").addEventListener("click",()=>{
+  if(accountingData.error)return;
+  $("#manualJournalForm").reset();$("#manualJournalDate").value=todayISO();
+  $("#manualJournalRequestKey").value=requestKey();
+  $("#manualJournalLines").innerHTML="";addManualLine();addManualLine();
+  $("#manualJournalError").classList.add("hidden");$("#manualJournalDialog").showModal();
+ });
+ $("#addManualJournalLine").addEventListener("click",addManualLine);
+ $("#manualJournalLines").addEventListener("click",event=>{
+  if(event.target.closest("[data-remove-journal-line]")&&$("#manualJournalLines").querySelectorAll("[data-manual-line]").length>2)event.target.closest("[data-manual-line]").remove();
+ });
+ $("#manualJournalForm").addEventListener("submit",async event=>{
+  event.preventDefault();const error=$("#manualJournalError"),button=event.submitter;
+  error.classList.add("hidden");if(button)button.disabled=true;
+  try{
+   const lines=[...$("#manualJournalLines").querySelectorAll("[data-manual-line]")].map(row=>({
+    account_code:row.querySelector("[data-manual-account]").value,
+    debit:Number(row.querySelector("[data-manual-debit]").value||0),
+    credit:Number(row.querySelector("[data-manual-credit]").value||0)
+   })).filter(line=>line.account_code&&(line.debit||line.credit));
+   const debit=lines.reduce((total,line)=>total+line.debit,0),credit=lines.reduce((total,line)=>total+line.credit,0);
+   if(!$("#manualJournalDate").value||!$("#manualJournalDescription").value.trim()||lines.length<2||debit<=0||Math.abs(debit-credit)>0.005)throw Error(`Jurnal harus memuat keterangan, minimal dua baris, dan debit sama dengan kredit. Debit ${money(debit)}; kredit ${money(credit)}.`);
+   await checked(db().rpc("post_accounting_manual_journal",{p_date:$("#manualJournalDate").value,p_description:$("#manualJournalDescription").value.trim(),p_cash_flow_activity:$("#manualJournalActivity").value,p_lines:lines,p_request_key:$("#manualJournalRequestKey").value}));
+   await loadData();$("#manualJournalDialog").close();toast("Jurnal manual berhasil diposting.");
+  }catch(err){error.textContent=err.message||"Jurnal manual gagal diposting.";error.classList.remove("hidden");}
+  finally{if(button)button.disabled=false}
+ });
+ $("#openCashReconciliation").addEventListener("click",()=>{
+  $("#cashReconciliationForm").reset();$("#reconciliationDate").value=todayISO();
+  $("#reconciliationRequestKey").value=requestKey();
+  $("#reconciliationError").classList.add("hidden");$("#cashReconciliationDialog").showModal();
+ });
+ $("#cashReconciliationForm").addEventListener("submit",async event=>{
+  event.preventDefault();const error=$("#reconciliationError"),button=event.submitter;
+  error.classList.add("hidden");if(button)button.disabled=true;
+  try{
+   const balance=Number($("#reconciliationBalance").value);
+   if(!Number.isFinite(balance)||!$("#reconciliationDate").value||!$("#reconciliationNote").value.trim())throw Error("Tanggal, saldo, dan catatan rekening koran wajib diisi.");
+   await checked(db().rpc("record_account_reconciliation",{p_account_code:$("#reconciliationAccount").value,p_statement_date:$("#reconciliationDate").value,p_statement_balance:balance,p_note:$("#reconciliationNote").value.trim(),p_request_key:$("#reconciliationRequestKey").value}));
+   await loadData();$("#cashReconciliationDialog").close();toast("Saldo rekening koran tersimpan; periksa nilai selisih pada laporan.");
+  }catch(err){error.textContent=err.message||"Rekonsiliasi gagal disimpan.";error.classList.remove("hidden");}
+  finally{if(button)button.disabled=false}
+ });
+ $("#accountingPaymentForm").addEventListener("submit",submitAccountingPayment);
+ document.addEventListener("click",event=>{
+  const button=event.target.closest("[data-record-customer-payment],[data-record-customer-refund],[data-record-obligation-payment]");
+  if(!button)return;
+  if(button.dataset.recordCustomerPayment)openAccountingPayment("customer_receipt",button.dataset.recordCustomerPayment,Number(button.dataset.paymentBalance));
+  else if(button.dataset.recordCustomerRefund)openAccountingPayment("customer_refund",button.dataset.recordCustomerRefund,Number(button.dataset.paymentBalance));
+  else openAccountingPayment(button.dataset.recordObligationPayment,button.dataset.obligationId,Number(button.dataset.paymentBalance));
+ });
 }
 async function deleteProduct(id){const p=products.find(p=>String(p.id)===id);if(!p)return;if(!confirm(`Nonaktifkan ${p.nama}? Barang tidak lagi ditampilkan di katalog/kasir, tetapi data transaksi dan stoknya tetap tersimpan.`))return;try{await checked(db().from("barang").update({aktif:false}).eq("id",id));cart=cart.filter(x=>String(x.id)!==id);await loadData();toast("Barang dinonaktifkan.")}catch(e){toast("Tidak bisa menonaktifkan barang: "+e.message,true)}}
 async function deleteCustomer(id){if(sales.some(s=>String(s.pelanggan_id)===id)){toast("Pelanggan terkait transaksi. Edit data atau pertahankan untuk riwayat.",true);return}if(!confirm("Hapus pelanggan ini?"))return;try{await checked(db().from("pelanggan").delete().eq("id",id));await loadData();toast("Pelanggan dihapus.")}catch(e){toast(e.message,true)}}
@@ -465,10 +621,11 @@ function excel(filename,sheets){
 function runReportExport(exporter){try{exporter()}catch(error){toast(error.message||"Laporan tidak dapat diekspor.",true)}}
 function exportProducts(){csv("laporan-persediaan.csv",[["SKU","Nama","Kategori","Satuan","Harga Beli","Harga Jual","Stok","Stok Minimum","Nilai Persediaan"],...products.map(p=>[p.sku,p.nama,p.kategori,p.satuan,p.harga_beli,p.harga_jual,p.stok,p.stok_minimum,productValue(p)])])}
 function exportCustomers(){csv("data-pelanggan.csv",[["Nama","Telepon","Alamat"],...customers.map(c=>[c.nama,c.telepon,c.alamat])])}
-function exportSales(){const valid=completedSales(),costs=valid.map(saleCost),complete=costs.every(cost=>cost!==null),revenue=valid.reduce((sum,sale)=>sum+Number(sale.total||0),0),cogs=complete?costs.reduce((sum,cost)=>sum+cost,0):null,expenseTotal=reportExpenses().reduce((sum,row)=>sum+Number(row.nominal||0),0),purchaseTotal=reportPurchases().reduce((sum,row)=>sum+Number(row.total??Number(row.jumlah||0)*Number(row.harga_satuan||0)),0);const rows=[["RINGKASAN LAPORAN — TOKO BUDI SEMBAKO"],["Dari tanggal",$("#reportFrom").value||"Semua tanggal"],["Sampai tanggal",$("#reportTo").value||"Semua tanggal"],["Status HPP",complete?"Lengkap":"Tidak lengkap — tinjau transaksi lama"],["Penjualan bersih",revenue],["Harga pokok penjualan",cogs],["Laba kotor",cogs===null?null:revenue-cogs],["Beban operasional",expenseTotal],["Laba bersih",cogs===null?null:revenue-cogs-expenseTotal],["Pembelian persediaan",purchaseTotal],["Arus kas operasional estimasi",revenue-purchaseTotal-expenseTotal],[],["PENJUALAN"],["Nomor Nota","Tanggal","Pelanggan","Subtotal","Diskon","Total","Metode","Dibayar","Kembalian","HPP","Status"],...reportRows().map(s=>[s.nomor_nota,s.tanggal,customers.find(c=>String(c.id)===String(s.pelanggan_id))?.nama||s.recipient_name||"Pelanggan umum",s.subtotal,s.diskon,s.total,s.metode_pembayaran,s.jumlah_dibayar,s.kembalian,saleCost(s),s.status]),[],["PENJUALAN PER BARANG"],["SKU","Barang","Qty","Penjualan setelah alokasi diskon","HPP","Laba kotor"],...productPerformanceRows(completedSales()).map(row=>[row.sku,row.name,row.quantity,row.net,row.costComplete?row.cost:null,row.margin]),[],["PEMBELIAN PERSEDIAAN"],["Tanggal","Barang","Jumlah","Harga Satuan","Total","Catatan"],...reportPurchases().map(p=>[p.tanggal,products.find(x=>String(x.id)===String(p.barang_id))?.nama||"Barang",p.jumlah,p.harga_satuan,p.total??Number(p.jumlah||0)*Number(p.harga_satuan||0),p.catatan]),[],["BEBAN OPERASIONAL"],["Tanggal","Kategori","Keterangan","Nominal"],...reportExpenses().map(x=>[x.tanggal,x.kategori,x.keterangan,x.nominal]),[],["BEBAN PER KATEGORI"],["Kategori","Jumlah Catatan","Total"],...expenseCategoryRows().map(row=>[row.name,row.count,row.total]),[],["MUTASI PERSEDIAAN"],["Tanggal","SKU","Barang","Jenis","Referensi","Masuk","Keluar","Saldo setelah","Catatan"],...stockMovementRows().map(row=>[row.tanggal,row.product?.sku||"",row.product?.nama||"",row.tipe,row.referensi,row.qty_masuk,row.qty_keluar,row.stok_setelah,row.catatan]),[],["VALUASI PERSEDIAAN SAAT INI (bukan saldo historis)"],["SKU","Barang","Satuan","Stok saat ini","Biaya rata-rata tercatat","Nilai stok","Batas minimum"],...inventoryValuationRows().map(row=>[row.sku,row.nama,row.satuan,row.stok,row.harga_beli,row.nilai,row.stok_minimum])];csv("laporan-keuangan-dan-persediaan-toko-budi-sembako.csv",rows)}
+function exportSales(){if(!window.RetailFinancialReports)throw new Error("Modul laporan belum tersedia. Muat ulang sebelum mengekspor.");const valid=completedSales(),costs=valid.map(saleCost),complete=costs.every(cost=>cost!==null),revenue=valid.reduce((sum,sale)=>sum+Number(sale.total||0),0),cogs=complete?costs.reduce((sum,cost)=>sum+cost,0):null,expenseTotal=reportExpenses().reduce((sum,row)=>sum+Number(row.nominal||0),0),purchaseTotal=reportPurchases().reduce((sum,row)=>sum+Number(row.total??Number(row.jumlah||0)*Number(row.harga_satuan||0)),0);const rows=[["RINGKASAN LAPORAN — TOKO BUDI SEMBAKO"],["Dari tanggal",$("#reportFrom").value||"Semua tanggal"],["Sampai tanggal",$("#reportTo").value||"Semua tanggal"],["Status HPP",complete?"Lengkap":"Tidak lengkap — tinjau transaksi lama"],["Penjualan bersih",revenue],["Harga pokok penjualan",cogs],["Laba kotor",cogs===null?null:revenue-cogs],["Beban operasional",expenseTotal],["Laba bersih",cogs===null?null:revenue-cogs-expenseTotal],["Pembelian persediaan",purchaseTotal],["Arus kas operasional estimasi",revenue-purchaseTotal-expenseTotal],[],["PENJUALAN"],["Nomor Nota","Tanggal","Pelanggan","Subtotal","Diskon","Total","Metode","Dibayar","Kembalian","HPP","Status"],...reportRows().map(s=>[s.nomor_nota,s.tanggal,customers.find(c=>String(c.id)===String(s.pelanggan_id))?.nama||s.recipient_name||"Pelanggan umum",s.subtotal,s.diskon,s.total,s.metode_pembayaran,s.jumlah_dibayar,s.kembalian,saleCost(s),s.status]),[],["PENJUALAN PER BARANG"],["SKU","Barang","Qty","Penjualan setelah alokasi diskon","HPP","Laba kotor"],...productPerformanceRows(completedSales()).map(row=>[row.sku,row.name,row.quantity,row.net,row.costComplete?row.cost:null,row.margin]),[],["PEMBELIAN PERSEDIAAN"],["Tanggal","Barang","Jumlah","Harga Satuan","Total","Catatan"],...reportPurchases().map(p=>[p.tanggal,products.find(x=>String(x.id)===String(p.barang_id))?.nama||"Barang",p.jumlah,p.harga_satuan,p.total??Number(p.jumlah||0)*Number(p.harga_satuan||0),p.catatan]),[],["BEBAN OPERASIONAL"],["Tanggal","Kategori","Keterangan","Nominal"],...reportExpenses().map(x=>[x.tanggal,x.kategori,x.keterangan,x.nominal]),[],["BEBAN PER KATEGORI"],["Kategori","Jumlah Catatan","Total"],...expenseCategoryRows().map(row=>[row.name,row.count,row.total]),[],["MUTASI PERSEDIAAN"],["Tanggal","SKU","Barang","Jenis","Referensi","Masuk","Keluar","Saldo setelah","Catatan"],...stockMovementRows().map(row=>[row.tanggal,row.product?.sku||"",row.product?.nama||"",row.tipe,row.referensi,row.qty_masuk,row.qty_keluar,row.stok_setelah,row.catatan]),[],["VALUASI PERSEDIAAN SAAT INI (bukan saldo historis)"],["SKU","Barang","Satuan","Stok saat ini","Biaya rata-rata tercatat","Nilai stok","Batas minimum"],...inventoryValuationRows().map(row=>[row.sku,row.nama,row.satuan,row.stok,row.harga_beli,row.nilai,row.stok_minimum])];csv("laporan-keuangan-dan-persediaan-toko-budi-sembako.csv",rows)}
 function exportProductsExcel(){excel("persediaan-toko-budi-sembako.xlsx",[{name:"Persediaan",rows:[["SKU","Nama Barang","Kategori","Satuan","Harga Beli (Rp)","Harga Jual (Rp)","Stok","Stok Minimum","Nilai Persediaan (Rp)"],...activeProducts().map(p=>[p.sku,p.nama,p.kategori,p.satuan,Number(p.harga_beli),Number(p.harga_jual),Number(p.stok),Number(p.stok_minimum),productValue(p)])]}])}
 function exportCustomersExcel(){excel("pelanggan-toko-budi-sembako.xlsx",[{name:"Pelanggan",rows:[["Nama","Telepon","Alamat"],...customers.map(c=>[c.nama,c.telepon||"",c.alamat||""])]}])}
 function exportSalesExcel(){
+ if(!window.RetailFinancialReports)throw new Error("Modul laporan belum tersedia. Muat ulang sebelum mengekspor.");
  const valid=completedSales();
  const saleCosts=valid.map(saleCost),costsComplete=saleCosts.every(cost=>cost!==null),revenue=valid.reduce((sum,s)=>sum+Number(s.total||0),0),cogs=costsComplete?saleCosts.reduce((sum,cost)=>sum+cost,0):null,expensesTotal=reportExpenses().reduce((sum,x)=>sum+Number(x.nominal||0),0),purchaseTotal=reportPurchases().reduce((sum,p)=>sum+Number(p.total??Number(p.jumlah||0)*Number(p.harga_satuan||0)),0);
  const methods=[["cash","Tunai"],["transfer","Transfer"],["qris","QRIS"],["debit","Kartu debit"]];
@@ -483,7 +640,7 @@ function exportSalesExcel(){
  const valuationRows=[["SKU","Barang","Satuan","Stok Saat Ini","Biaya Rata-rata Tercatat (Rp)","Nilai Saat Ini (Rp)","Batas Minimum"],...inventoryValuationRows().map(row=>[row.sku,row.nama,row.satuan,Number(row.stok||0),Number(row.harga_beli||0),row.nilai,Number(row.stok_minimum||0)])];
  excel("laporan-keuangan-dan-persediaan-toko-budi-sembako.xlsx",[{name:"Laba Rugi",rows:summary},{name:"Penjualan",rows:salesRows},{name:"Penjualan per Barang",rows:productRows},{name:"Pembelian Stok",rows:purchaseRows},{name:"Beban Operasional",rows:expenseRows},{name:"Beban per Kategori",rows:categoryRows},{name:"Metode Pembayaran",rows:paymentRows},{name:"Mutasi Stok",rows:movementRows},{name:"Valuasi Saat Ini",rows:valuationRows}]);
 }
-async function submitStockIn(e){e.preventDefault();$("#stockInError").classList.add("hidden");const id=$("#stockInProduct").value,qty=Number($("#stockInQty").value),cost=Number($("#stockInCost").value),note=$("#stockInNote").value.trim();try{if(!id||!Number.isFinite(qty)||qty<=0||!Number.isFinite(cost)||cost<0)throw Error("Pilih barang dan masukkan jumlah serta harga beli yang valid.");await checked(db().rpc("record_stock_in",{p_product_id:id,p_qty:qty,p_unit_cost:cost,p_note:note||null}));await loadData();$("#stockInDialog").close();$("#stockInForm").reset();toast("Stok masuk berhasil dicatat.");}catch(err){$("#stockInError").textContent=err.message||"Gagal mencatat stok masuk." ;$("#stockInError").classList.remove("hidden")}}
+async function submitStockIn(e){e.preventDefault();$("#stockInError").classList.add("hidden");const id=$("#stockInProduct").value,qty=Number($("#stockInQty").value),cost=Number($("#stockInCost").value),paid=Number($("#stockInPaymentAmount").value),method=$("#stockInPaymentMethod").value,note=$("#stockInNote").value.trim();try{if(!id||!Number.isFinite(qty)||qty<=0||!Number.isFinite(cost)||cost<=0||!Number.isFinite(paid)||paid<0||paid>qty*cost)throw Error("Pilih barang dan masukkan jumlah, biaya, serta pembayaran yang valid; pembayaran tidak boleh melebihi nilai stok masuk.");await checked(db().rpc("record_stock_in",{p_product_id:id,p_qty:qty,p_unit_cost:cost,p_note:note||null,p_paid_amount:paid,p_payment_method:method,p_request_key:$("#stockInRequestKey").value}));await loadData();$("#stockInDialog").close();$("#stockInForm").reset();toast("Pembelian stok dan jurnal berhasil dicatat.");}catch(err){$("#stockInError").textContent=err.message||"Gagal mencatat stok masuk." ;$("#stockInError").classList.remove("hidden")}}
 async function cancelSale(id){if(!confirm("Batalkan transaksi ini dan kembalikan stok?"))return;try{await checked(db().rpc("cancel_sale",{p_sale_id:id}));await loadData();toast("Transaksi dibatalkan dan stok dikembalikan.")}catch(e){toast("Pembatalan gagal: "+e.message,true)}}
 function setup(){
  const disclaimer=$(".disclaimer"),footerNote=$(".footer span");
@@ -491,7 +648,7 @@ function setup(){
  if(footerNote)footerNote.textContent="HTML · CSS · JavaScript · Supabase";
  $("#today").textContent=new Intl.DateTimeFormat("id-ID",{day:"numeric",month:"short",year:"numeric"}).format(new Date());
  $$(".nav-item").forEach(b=>b.addEventListener("click",()=>page(b.dataset.page)));$$("[data-goto]").forEach(b=>b.addEventListener("click",()=>page(b.dataset.goto)));
- $("#addProduct").onclick=()=>openProduct();$("#downloadProductTemplate").onclick=productCsvTemplate;$("#importProductsButton").onclick=()=>$("#importProductsFile").click();$("#importProductsFile").addEventListener("change",importProductsFile);$("#stockInButton").onclick=()=>{if(!products.length){toast("Tambahkan master barang terlebih dahulu.",true);return;}populateStockInProducts();$("#stockInForm").reset();populateStockInProducts();$("#stockInError").classList.add("hidden");$("#stockInDialog").showModal()};$("#stockInForm").addEventListener("submit",submitStockIn);$("#stockInProduct").addEventListener("change",()=>{const p=products.find(p=>String(p.id)===$("#stockInProduct").value);if(p)$("#stockInCost").value=p.harga_beli});$("#productForm").addEventListener("submit",saveProduct);$("#chooseProductPhoto").onclick=()=>$("#productPhoto").click();$("#productPhoto").addEventListener("change",selectProductPhoto);$("#removeProductPhoto").onclick=()=>{removeProductPhoto=true;renderPhotoPreview(null);$("#productPhoto").value="";};$("#productSearch").addEventListener("input",renderProducts);$("#stockFilter").addEventListener("change",renderProducts);
+ $("#addProduct").onclick=()=>openProduct();$("#downloadProductTemplate").onclick=productCsvTemplate;$("#importProductsButton").onclick=()=>$("#importProductsFile").click();$("#importProductsFile").addEventListener("change",importProductsFile);$("#stockInButton").onclick=()=>{if(!products.length){toast("Tambahkan master barang terlebih dahulu.",true);return;}populateStockInProducts();$("#stockInForm").reset();$("#stockInPaymentAmount").value=0;$("#stockInRequestKey").value=requestKey();populateStockInProducts();$("#stockInError").classList.add("hidden");$("#stockInDialog").showModal()};$("#stockInForm").addEventListener("submit",submitStockIn);$("#stockInProduct").addEventListener("change",()=>{const p=products.find(p=>String(p.id)===$("#stockInProduct").value);if(p)$("#stockInCost").value=p.harga_beli});$("#productForm").addEventListener("submit",saveProduct);$("#chooseProductPhoto").onclick=()=>$("#productPhoto").click();$("#productPhoto").addEventListener("change",selectProductPhoto);$("#removeProductPhoto").onclick=()=>{removeProductPhoto=true;renderPhotoPreview(null);$("#productPhoto").value="";};$("#productSearch").addEventListener("input",renderProducts);$("#stockFilter").addEventListener("change",renderProducts);
  $("#productsTable").addEventListener("click",e=>{const edit=e.target.closest("[data-edit-product]"),del=e.target.closest("[data-delete-product]");if(edit)openProduct(products.find(p=>String(p.id)===edit.dataset.editProduct));if(del)deleteProduct(del.dataset.deleteProduct)});
  $("#saleSearch").addEventListener("input",renderSaleProducts);$("#saleProductGrid").addEventListener("click",e=>{const b=e.target.closest("[data-add-cart]");if(b)addCart(b.dataset.addCart)});
  $("#cartItems").addEventListener("click",e=>{const minus=e.target.closest("[data-cart-minus]"),plus=e.target.closest("[data-cart-plus]"),remove=e.target.closest("[data-cart-remove]");if(minus)changeCart(minus.dataset.cartMinus,-1);if(plus)changeCart(plus.dataset.cartPlus,1);if(remove){cart=cart.filter(x=>String(x.id)!==remove.dataset.cartRemove);renderCart()}});
@@ -501,6 +658,16 @@ function setup(){
  $("#addExpense").onclick=openExpense;$("#expenseForm").addEventListener("submit",saveExpense);$("#expensesTable").addEventListener("click",e=>{const b=e.target.closest("[data-delete-expense]");if(b)deleteExpense(b.dataset.deleteExpense)});
  $("#exportProducts").onclick=exportProducts;$("#exportProductsExcel").onclick=exportProductsExcel;$("#exportCustomers").onclick=exportCustomers;$("#exportCustomersExcel").onclick=exportCustomersExcel;$("#exportSales").onclick=()=>runReportExport(exportSales);$("#exportSalesExcel").onclick=()=>runReportExport(exportSalesExcel);
  $("#refreshDelivery").onclick=()=>loadData().catch(error=>{statusConnection(false);toast("Pesanan gagal dimuat: "+error.message,true)});$("#deliveryOrders").addEventListener("click",event=>{const button=event.target.closest("[data-delivery-status]");if(button)handleDeliveryAction(button.dataset.deliveryStatus,button.dataset.deliveryId,button)});
+ if(window.RetailFinancialReports){
+  $("#exportSales").onclick=null;
+  $("#exportSalesExcel").onclick=null;
+  window.RetailFinancialReports.setup({
+   getData:()=>({sales,purchases,expenses,stockMovements,products,saleItems,customers,accounting:accountingData}),
+   refresh:async()=>{try{await loadData()}catch(error){statusConnection(false);throw error}},
+   notify:toast
+  });
+ }
+ setupAccountingTools();
  document.addEventListener("click",handlePrintReceiptClick);
  $("#logoutButton").onclick=logout;
  $$("[data-close]").forEach(b=>b.addEventListener("click",()=>$("#"+b.dataset.close).close()));
@@ -524,11 +691,11 @@ async function init(){
  setup();
  statusConnection();
  try{await loadData();}
- catch(error){statusConnection(false);toast("Data Supabase tidak dapat dimuat: "+error.message,true);}
+ catch(error){statusConnection(false);window.RetailFinancialReports?.setError(error.message);toast("Data Supabase tidak dapat dimuat: "+error.message,true);}
  window.RetailAuth.onAuthStateChange(event=>{
   if(event==="SIGNED_OUT")location.replace("login.html");
  });
- window.addEventListener("focus",()=>loadData().catch(error=>{statusConnection(false);toast("Sinkronisasi Supabase gagal: "+error.message,true)}));
+ window.addEventListener("focus",()=>loadData().catch(error=>{statusConnection(false);window.RetailFinancialReports?.setError(error.message);toast("Sinkronisasi Supabase gagal: "+error.message,true)}));
 }
 document.addEventListener("DOMContentLoaded",init);
 })();
