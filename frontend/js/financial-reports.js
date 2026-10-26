@@ -323,6 +323,7 @@
     const netCashChange = sum(activityRows, row => row.net);
     const openingEntry = entryById.get(String(accounting.settings.opening_entry_id));
     const hasOpening = Boolean(openingEntry && openingEntry.entry_date <= endDate);
+    const openingDraft = accounting.openingDraft || null;
     const openingLines = (linesByEntry.get(String(accounting.settings.opening_entry_id)) || [])
       .filter(line => accountById.get(String(line.account_id))?.is_cash_equivalent);
     const openingCash = !hasOpening ? null : startDate === cutoverDate
@@ -373,9 +374,45 @@
       .map(account => ({ ...account, amount: account.account_type === "equity"
         ? account.normal_balance === "credit" ? normalBalance(account) : -normalBalance(account)
         : normalBalance(account) }));
+    const trialBalanceRows = accounts.map(account => {
+      const accountLines = linesByAccount.get(String(account.id)) || [];
+      const openingNet = hasOpening
+        ? sum(accountLines.filter(line => String(line.journal_entry_id) === String(openingEntry.id)),
+          line => Number(line.debit || 0) - Number(line.credit || 0))
+        : null;
+      const movementLines = accountLines.filter(line => {
+        const entry = entryById.get(String(line.journal_entry_id));
+        return entry && entry.id !== openingEntry?.id &&
+          entry.entry_date >= cutoverDate && entry.entry_date <= endDate;
+      });
+      const movementDebit = sum(movementLines, line => Number(line.debit || 0));
+      const movementCredit = sum(movementLines, line => Number(line.credit || 0));
+      const endingNet = hasOpening ? openingNet + movementDebit - movementCredit : null;
+      return {
+        code: account.code,
+        name: account.name,
+        openingDebit: openingNet === null ? null : Math.max(openingNet, 0),
+        openingCredit: openingNet === null ? null : Math.max(-openingNet, 0),
+        movementDebit,
+        movementCredit,
+        endingDebit: endingNet === null ? null : Math.max(endingNet, 0),
+        endingCredit: endingNet === null ? null : Math.max(-endingNet, 0)
+      };
+    });
+    trialBalanceRows.push({
+      code: "",
+      name: "TOTAL",
+      openingDebit: hasOpening ? sum(trialBalanceRows, row => row.openingDebit) : null,
+      openingCredit: hasOpening ? sum(trialBalanceRows, row => row.openingCredit) : null,
+      movementDebit: sum(trialBalanceRows, row => row.movementDebit),
+      movementCredit: sum(trialBalanceRows, row => row.movementCredit),
+      endingDebit: hasOpening ? sum(trialBalanceRows, row => row.endingDebit) : null,
+      endingCredit: hasOpening ? sum(trialBalanceRows, row => row.endingCredit) : null
+    });
     return {
       error: "",
       accounts, entries, lines, payments, startDate, endDate, cutoverDate,
+      openingDraft,
       hasOpening, allBalanced, balanceDifference, assets, liabilities, equityAccounts,
       assetTotal, liabilityTotal, equityTotal, profitToDate, profitAndLossRows, cashAccounts,
       openingCash: hasOpening ? openingCash : null,
@@ -387,7 +424,8 @@
       cashByMethod: [...cashByMethod.entries()].map(([method, totals]) => ({ method, ...totals })),
       inventoryActual, inventoryLedger, inventoryComparable, inventoryDifference,
       reconciliationRows, paymentPostingDifference,
-      balanceSheetBalances: accountRows
+      balanceSheetBalances: accountRows,
+      trialBalanceRows
     };
   }
 
@@ -504,6 +542,39 @@
     setText("#reportCashflow", model.accounting.error
       ? model.accounting.unavailableBeforeCutover ? "Data historis belum tersedia" : "Ledger belum tersedia"
       : model.accounting.hasOpening ? currency(model.accounting.netCashChange) : "Saldo awal belum dicatat");
+    const openingStatus = document.querySelector("#openingBalanceStatus");
+    if (openingStatus) {
+      const rawAccounting = source.accounting || {};
+      const openingEntryId = rawAccounting.settings?.opening_entry_id;
+      const entry = (rawAccounting.entries || []).find(row => String(row.id) === String(openingEntryId));
+      if (rawAccounting.error || !rawAccounting.settings) {
+        openingStatus.textContent = `Status saldo awal belum dapat diperiksa: ${rawAccounting.error || "Pengaturan akuntansi tidak tersedia."}`;
+      } else if (rawAccounting.openingDraftError && !rawAccounting.settings.opening_entry_id) {
+        openingStatus.textContent = rawAccounting.openingDraftError;
+      } else if (entry) {
+        const openingLines = (rawAccounting.lines || []).filter(line => String(line.journal_entry_id) === String(entry.id));
+        const debit = sum(openingLines, line => Number(line.debit || 0));
+        const credit = sum(openingLines, line => Number(line.credit || 0));
+        const draft = rawAccounting.openingDraft;
+        openingStatus.textContent = `Saldo Awal Tercatat — tanggal ${entry?.entry_date || accounting.cutoverDate}; debit ${currency(debit)}; kredit ${currency(credit)}; jurnal ${entry?.id || "tidak tersedia"}; sumber ${draft?.supporting_source || "metadata tidak tersedia"}; referensi ${draft?.reference_number || "tidak dicantumkan"}.`;
+      } else if (openingEntryId) {
+        openingStatus.textContent = `Data akuntansi perlu diperiksa: pengaturan menunjuk jurnal saldo awal ${openingEntryId}, tetapi jurnalnya tidak ditemukan. Jangan posting ulang.`;
+      } else if (rawAccounting.openingDraft) {
+        const draft = rawAccounting.openingDraft;
+        const lines = Array.isArray(draft.lines) ? draft.lines : [];
+        const required = rawAccounting.accounts.filter(account => account.is_active &&
+          ["asset", "liability", "equity"].includes(account.account_type));
+        const debit = sum(lines, line => Number(line.debit || 0));
+        const credit = sum(lines, line => Number(line.credit || 0));
+        const incomplete = required.filter(account => {
+          const line = lines.find(row => String(row.account_code) === String(account.code));
+          return !line || ((line.debit === null || line.debit === "") && (line.credit === null || line.credit === ""));
+        });
+        openingStatus.textContent = `Saldo Awal Belum Diposting — draft tersimpan. Akun yang belum diisi: ${incomplete.map(account => `${account.code} ${account.name}`).join(", ") || "tidak ada"}; selisih draft debit-kredit ${currency(debit-credit)}. Draft tidak memengaruhi laporan.`;
+      } else {
+        openingStatus.textContent = "Saldo awal belum dicatat. Gunakan tombol Input Saldo Awal untuk mengisi saldo dari catatan usaha; nilai yang belum diketahui tidak dianggap nol.";
+      }
+    }
     setText("#reportPurchases", currency(sum(model.purchases, row => Number(row.total ?? Number(row.jumlah || 0) * Number(row.harga_satuan || 0)))));
 
     const costNotice = document.querySelector("#legacyCostNotice");
@@ -625,6 +696,12 @@
       : table(balanceRows, ["Kelompok", "Kode", "Akun", "Saldo (Rp)"], row =>
         `<tr class="${String(row[0]).startsWith("TOTAL") || row[0] === "SELISIH NERACA" ? "bold" : ""}"><td>${escapeHtml(row[0])}</td><td>${escapeHtml(row[1])}</td><td>${escapeHtml(row[2])}</td><td>${currency(row[3])}</td></tr>`,
       "Belum ada saldo buku pada tanggal laporan");
+    const trialBalanceNode = document.querySelector("#trialBalanceTable");
+    if (trialBalanceNode) trialBalanceNode.innerHTML = accounting.error
+      ? `<div class="report-limitation">${escapeHtml(accounting.error)}</div>`
+      : table(accounting.trialBalanceRows, ["Kode", "Akun", "Saldo awal debit", "Saldo awal kredit", "Mutasi debit", "Mutasi kredit", "Saldo akhir debit", "Saldo akhir kredit"], row =>
+        `<tr class="${row.name === "TOTAL" ? "bold" : ""}"><td>${escapeHtml(row.code)}</td><td>${escapeHtml(row.name)}</td><td>${row.openingDebit === null ? "Belum tersedia" : currency(row.openingDebit)}</td><td>${row.openingCredit === null ? "Belum tersedia" : currency(row.openingCredit)}</td><td>${currency(row.movementDebit)}</td><td>${currency(row.movementCredit)}</td><td>${row.endingDebit === null ? "Belum tersedia" : currency(row.endingDebit)}</td><td>${row.endingCredit === null ? "Belum tersedia" : currency(row.endingCredit)}</td></tr>`,
+      "Belum ada neraca saldo");
     const balanceWarning = document.querySelector("#balanceSheetWarning");
     if (balanceWarning) {
       const warnings = [];
@@ -638,7 +715,7 @@
       balanceWarning.textContent = warnings.join(" ");
     }
     const reconcileRows = accounting.error ? [] : [
-      ["Saldo awal terverifikasi", accounting.hasOpening ? "Dicatat pada tanggal cutover" : "Belum dicatat"],
+      ["Saldo awal tercatat", accounting.hasOpening ? "Dicatat pada tanggal cutover" : "Belum dicatat"],
       ["Keseimbangan seluruh jurnal", accounting.allBalanced ? "Seimbang" : "ADA JURNAL TIDAK SEIMBANG"],
       ["Selisih total debit-kredit neraca", currency(accounting.balanceDifference)],
       ["Jurnal pembayaran dibanding sumber", Math.abs(accounting.paymentPostingDifference) <= 0.01
@@ -678,7 +755,14 @@
       reconciliationWarning.classList.toggle("hidden", issues.length === 0);
       reconciliationWarning.textContent = accounting.error || issues.join(" ");
     }
-    document.querySelector("#openOpeningBalances")?.toggleAttribute("disabled", Boolean(accounting.error || accounting.hasOpening));
+    const openingButton = document.querySelector("#openOpeningBalances");
+    if (openingButton) {
+      const rawAccounting = source.accounting || {};
+      const isPosted = Boolean(rawAccounting.settings?.opening_entry_id);
+      openingButton.disabled = Boolean(rawAccounting.error || rawAccounting.openingDraftError || isPosted);
+      openingButton.textContent = isPosted ? "Saldo Awal Tercatat"
+        : rawAccounting.openingDraft ? "Lanjutkan Draft Saldo Awal" : "Input Saldo Awal";
+    }
     document.querySelector("#openManualJournal")?.toggleAttribute("disabled", Boolean(accounting.error));
     document.querySelector("#openCashReconciliation")?.toggleAttribute("disabled", Boolean(accounting.error));
 
@@ -857,7 +941,7 @@
         actions.append(opening, journal, reconciliation, refresh, print, packageExport);
       }
     }
-    const oldNotice = page.querySelector(".demo-data-notice:not(#legacyCostNotice):not(#reportDataError)");
+    const oldNotice = page.querySelector(".demo-data-notice:not(#legacyCostNotice):not(#reportDataError):not(#openingBalanceStatus)");
     if (oldNotice) oldNotice.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>Jurnal akuntansi dimulai pada tanggal cutover. Data lama tidak direkonstruksi karena riwayat pembayaran dan saldo awal tidak tersedia. Lengkapi dan verifikasi saldo awal sebelum memakai neraca. QRIS/kartu debit dicatat ke Bank pada tanggal transaksi sesuai kebijakan cutover; konfirmasi dengan mutasi bank Anda. Laporan tetap menampilkan selisih rekonsiliasi dan batas data.</span>';
     const revenueStat = page.querySelector("#reportRevenue")?.closest(".stat");
     if (revenueStat) revenueStat.querySelector(".stat-head span:last-child").textContent = "Penjualan tercatat setelah diskon";
@@ -948,6 +1032,7 @@
       const income = page.querySelector("#incomeStatement")?.closest(".panel");
       const cash = addStatement("cashFlowStatement", "Laporan arus kas", "Mutasi kas dan bank dari jurnal pembayaran; grafik menunjukkan perubahan bersih per bulan, bukan saldo akhir karena saldo awal harus diverifikasi.", income || totals);
       const balance = addStatement("balanceSheet", "Neraca", "Saldo akun per akhir periode; laporan ditandai belum lengkap sampai saldo awal diverifikasi.", cash);
+      balance.insertAdjacentHTML("beforeend", '<div class="section-gap"><div class="panel-head"><div><h3>Neraca saldo / mutasi buku besar</h3><p>Saldo pembukaan, mutasi debit-kredit sejak cutover, dan saldo akhir menurut jurnal.</p></div></div><div id="trialBalanceTable" class="table-scroll"></div></div>');
       addStatement("accountingReconciliation", "Rekonsiliasi", "Periksa keseimbangan jurnal, saldo persediaan, mutasi pembayaran, serta saldo kas/bank dibandingkan rekening koran.", balance);
       const tabTargets = tabs.querySelectorAll("[data-report-target]");
       tabTargets.forEach(button => {
@@ -1117,6 +1202,13 @@
       { name: "Laba Rugi", rows: sheetRows(ledger ? "Laba Rugi dari Jurnal" : "Laba Rugi Operasional (Provisional)", ledger ? ["Kode", "Akun", "Nominal (Rp)"] : ["Keterangan", "Nominal (Rp)"], ledger ? ledgerPnl : pnl) },
       { name: "Arus Kas", rows: sheetRows("Arus Kas Jurnal Kas dan Bank", ["Aktivitas / Metode", "Kas masuk (Rp)", "Kas keluar (Rp)", "Neto (Rp)"], cashFlowRows) },
       { name: "Neraca", rows: sheetRows("Neraca per Akhir Periode", ["Kelompok", "Kode", "Akun", "Saldo (Rp)"], balanceSheetRows) },
+      { name: "Neraca Saldo", rows: sheetRows("Saldo Pembukaan, Mutasi, dan Saldo Akhir", [
+        "Kode", "Akun", "Saldo awal debit (Rp)", "Saldo awal kredit (Rp)",
+        "Mutasi debit (Rp)", "Mutasi kredit (Rp)", "Saldo akhir debit (Rp)", "Saldo akhir kredit (Rp)"
+      ], ledger ? ledger.trialBalanceRows.map(row => [
+        row.code, row.name, row.openingDebit ?? "Belum tersedia", row.openingCredit ?? "Belum tersedia", row.movementDebit,
+        row.movementCredit, row.endingDebit ?? "Belum tersedia", row.endingCredit ?? "Belum tersedia"
+      ]) : [["", model.accounting.error, "Tidak tersedia"]]) },
       { name: "Persediaan", rows: sheetRows("Valuasi Stok Saat Ini (Bukan Historis)", [
         "SKU", "Nama barang", "Kategori", "Satuan", "Stok saat ini", "Biaya rata-rata tercatat (Rp)", "Nilai saat ini (Rp)", "Stok minimum", "Status"
       ], inventoryRows) },

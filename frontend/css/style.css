@@ -269,6 +269,8 @@ body {
 .report-period{margin:5px 0 0;color:#64748b;font-size:11px}
 .report-limitation{padding:15px;border:1px solid #f1d4a6;border-radius:10px;background:#fff9ed;color:#80520b;font-size:12px;line-height:1.7}
 .accounting-lines{display:grid;gap:8px;margin:14px 0}.accounting-line{display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(100px,1fr) minmax(100px,1fr) auto;gap:8px;align-items:center}.accounting-account{font-size:12px}.accounting-line .control{min-width:0}.accounting-line[data-manual-line]{grid-template-columns:minmax(180px,1.4fr) minmax(100px,1fr) minmax(100px,1fr) auto}.accounting-line .table-action{min-width:34px}.report-warning{white-space:normal}
+.opening-balance-heading,.opening-balance-line{grid-template-columns:minmax(180px,1.6fr) minmax(90px,.6fr) minmax(130px,1fr) minmax(130px,1fr)}.opening-balance-line>span:first-child{display:grid;gap:3px}.opening-balance-line small{color:var(--muted,#64748b);font-size:11px}.opening-balance-heading b{font-size:12px}.opening-balance-line .control{width:100%}
+@media(max-width:700px){.opening-balance-heading{display:none}.opening-balance-line{grid-template-columns:minmax(0,1fr) minmax(100px,1fr)}.opening-balance-line>span:first-child{grid-column:1/-1}.opening-balance-line>span:nth-child(2){grid-column:1/-1}}
 .report-select-field{min-width:145px}
 .report-filter-unavailable{align-self:center;color:#81778e;font-size:10px}
 #stockMovementsTable{margin-top:20px}

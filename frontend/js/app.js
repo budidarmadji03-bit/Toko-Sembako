@@ -84,10 +84,13 @@ async function loadData(){
   fetchAll(client.from("journal_lines").select("*").order("id")),
   fetchAll(client.from("accounting_payments").select("*").order("payment_date").order("id")),
   fetchAll(client.from("account_reconciliations").select("*").order("statement_date",{ascending:false}).order("id"))
- ]).then(([settings,accounts,entries,lines,payments,reconciliations])=>({
-  settings,accounts,entries,lines,payments,reconciliations,error:""
+ ]).then(async ([settings,accounts,entries,lines,payments,reconciliations])=>{
+  let openingDraft=null,openingDraftError="";
+  try{openingDraft=await checked(client.from("accounting_opening_drafts").select("*").eq("id",true).maybeSingle())}
+  catch(error){openingDraftError=`Fitur draft saldo awal belum tersedia; jalankan migrasi backend/sql/11_opening_balance_drafts.sql. ${error.message||""}`}
+  return {settings,accounts,entries,lines,payments,reconciliations,openingDraft,openingDraftError,error:""};
  })).catch(error=>({
-  settings:null,accounts:[],entries:[],lines:[],payments:[],reconciliations:[],
+  settings:null,accounts:[],entries:[],lines:[],payments:[],reconciliations:[],openingDraft:null,openingDraftError:"",
   error:`Akuntansi belum tersedia: ${error.message||"migrasi atau akses Owner belum siap."}`
  }));
  const [rows,accounting]=await Promise.all([operationalData,accountingRequest])
@@ -504,35 +507,78 @@ async function submitAccountingPayment(event){
 function accountingSelectOptions(accounts,selected=""){
  return accounts.filter(account=>account.is_active).map(account=>`<option value="${esc(account.code)}"${account.code===selected?" selected":""}>${esc(account.code)} — ${esc(account.name)}</option>`).join("");
 }
-function accountingLineRow(accounts,opening=false){
+function accountingLineRow(accounts,opening=false,openingBalance=null){
  if(opening){
-  return `<div class="accounting-line"><b class="accounting-account">${esc(accounts.code)} — ${esc(accounts.name)}</b><input class="control" type="number" min="0" step="0.01" data-opening-debit aria-label="Debit ${esc(accounts.name)}" placeholder="Debit"><input class="control" type="number" min="0" step="0.01" data-opening-credit aria-label="Kredit ${esc(accounts.name)}" placeholder="Kredit"></div>`;
+  const typeLabels={asset:"Aset",liability:"Liabilitas",equity:"Ekuitas"};
+  return `<div class="accounting-line opening-balance-line" data-opening-account="${esc(accounts.code)}" data-normal-balance="${esc(accounts.normal_balance)}"><span><b class="accounting-account">${esc(accounts.code)} — ${esc(accounts.name)}</b><small>${typeLabels[accounts.account_type]||esc(accounts.account_type)}</small></span><span>${accounts.normal_balance==="debit"?"Debit":"Kredit"}</span><input class="control" type="number" min="0" step="0.01" data-opening-debit aria-label="Saldo debit ${esc(accounts.name)}" placeholder="Belum diketahui" value="${esc(openingBalance?.debit??"")}"><input class="control" type="number" min="0" step="0.01" data-opening-credit aria-label="Saldo kredit ${esc(accounts.name)}" placeholder="Belum diketahui" value="${esc(openingBalance?.credit??"")}"></div>`;
  }
  return `<div class="accounting-line" data-manual-line><select class="control" data-manual-account required><option value="">Pilih akun</option>${accountingSelectOptions(accounts)}</select><input class="control" type="number" min="0" step="0.01" data-manual-debit aria-label="Debit" placeholder="Debit"><input class="control" type="number" min="0" step="0.01" data-manual-credit aria-label="Kredit" placeholder="Kredit"><button type="button" class="table-action danger" data-remove-journal-line aria-label="Hapus baris">×</button></div>`;
 }
 function setupAccountingTools(){
  $("#openOpeningBalances").addEventListener("click",()=>{
-  if(accountingData.error||accountingData.settings?.opening_entry_id)return;
+  if(accountingData.error||accountingData.openingDraftError||accountingData.settings?.opening_entry_id)return;
   const date=accountingData.settings.cutover_date;
-  $("#openingBalancesDate").textContent=`Tanggal saldo awal: ${date}. Masukkan saldo yang sudah diperiksa.`;
+  const draft=accountingData.openingDraft;
+  $("#openingBalancesDate").textContent=`Tanggal cutover / jurnal pembukaan: ${date}. Jurnal ini akan menjadi saldo pembuka, bukan penerimaan kas periode berjalan.`;
+  $("#openingBalanceSource").value=draft?.supporting_source||"";
+  $("#openingBalanceReference").value=draft?.reference_number||"";
+  const draftLines=new Map((draft?.lines||[]).map(line=>[String(line.account_code),line]));
   $("#openingBalanceLines").innerHTML=accountingData.accounts
    .filter(account=>account.is_active&&["asset","liability","equity"].includes(account.account_type))
-   .map(account=>accountingLineRow(account,true)).join("");
+   .map(account=>{
+    const line=draftLines.get(String(account.code));
+    return accountingLineRow(account,true,line);
+   }).join("");
+  const missing=accountingData.accounts.filter(account=>{
+   if(!account.is_active||!["asset","liability","equity"].includes(account.account_type))return false;
+   const line=draftLines.get(String(account.code));
+   return !line||(line.debit==null||line.debit==="")&&(line.credit==null||line.credit==="");
+  }).map(account=>account.code);
+  $("#openingBalanceDraftStatus").textContent=draft?.posted_entry_id
+   ? "Saldo awal sudah diposting; draft dikunci."
+   : draft ? `Draft tersimpan pada ${new Date(draft.updated_at).toLocaleString("id-ID")}.${missing.length?` Akun yang belum tersimpan: ${missing.join(", ")}.`:""} Kolom kosong tetap belum diketahui.`
+    : "Belum ada draft. Kolom saldo dibiarkan kosong sampai nilainya diperiksa.";
   $("#openingBalanceError").classList.add("hidden");$("#openingBalancesDialog").showModal();
  });
  $("#openingBalancesForm").addEventListener("submit",async event=>{
   event.preventDefault();const error=$("#openingBalanceError"),button=event.submitter;
   error.classList.add("hidden");if(button)button.disabled=true;
   try{
-   const lines=[...$("#openingBalanceLines").querySelectorAll(".accounting-line")].map(row=>({
-    account_code:row.querySelector(".accounting-account").textContent.split(" — ")[0],
-    debit:Number(row.querySelector("[data-opening-debit]").value||0),
-    credit:Number(row.querySelector("[data-opening-credit]").value||0)
-   })).filter(line=>line.debit||line.credit);
-   const debit=lines.reduce((total,line)=>total+line.debit,0),credit=lines.reduce((total,line)=>total+line.credit,0);
-   if(lines.length<2||debit<=0||Math.abs(debit-credit)>0.005)throw Error(`Saldo awal harus seimbang. Debit ${money(debit)}; kredit ${money(credit)}. Tidak ada nilai penyeimbang otomatis.`);
-   await checked(db().rpc("set_accounting_opening_balances",{p_lines:lines}));
-   await loadData();$("#openingBalancesDialog").close();toast("Saldo awal terverifikasi berhasil dijurnal.");
+   const rows=[...$("#openingBalanceLines").querySelectorAll("[data-opening-account]")];
+   const lines=rows.map(row=>{
+    const debit=row.querySelector("[data-opening-debit]").value.trim();
+    const credit=row.querySelector("[data-opening-credit]").value.trim();
+    return {account_code:row.dataset.openingAccount,debit,credit,normal_balance:row.dataset.normalBalance};
+   });
+   const payload=lines.map(({normal_balance,...line})=>({
+    account_code:line.account_code,debit:line.debit||null,credit:line.credit||null
+   }));
+   const source=$("#openingBalanceSource").value.trim();
+   const reference=$("#openingBalanceReference").value.trim();
+   if(button?.value==="draft"){
+    await checked(db().rpc("save_accounting_opening_draft",{
+     p_lines:payload,p_supporting_source:source||null,p_reference_number:reference||null
+    }));
+    await loadData();$("#openingBalancesDialog").close();toast("Draft saldo awal tersimpan; belum memengaruhi laporan.");
+    return;
+   }
+   if(!source)throw Error("Sumber saldo atau keterangan pendukung wajib diisi sebelum posting.");
+   const incomplete=lines.filter(line=>line.debit===""&&line.credit==="").map(line=>line.account_code);
+   if(incomplete.length)throw Error(`Lengkapi semua akun neraca. Isi 0 jika saldo memang tidak ada. Belum lengkap: ${incomplete.join(", ")}.`);
+   const postLines=lines.map(line=>{
+    const debit=line.debit===""?0:Number(line.debit);
+    const credit=line.credit===""?0:Number(line.credit);
+    if(!Number.isFinite(debit)||!Number.isFinite(credit)||debit<0||credit<0||(debit>0&&credit>0))throw Error(`Nominal akun ${line.account_code} tidak valid; isi satu posisi saldo saja.`);
+    if(debit>0&&line.normal_balance!=="debit")throw Error(`Akun ${line.account_code} bersaldo normal kredit; periksa posisinya.`);
+    if(credit>0&&line.normal_balance!=="credit")throw Error(`Akun ${line.account_code} bersaldo normal debit; periksa posisinya.`);
+    return {account_code:line.account_code,debit,credit};
+   });
+   const debit=postLines.reduce((total,line)=>total+line.debit,0),credit=postLines.reduce((total,line)=>total+line.credit,0);
+   if(debit<=0||Math.abs(debit-credit)>0.005)throw Error(`Saldo awal harus seimbang. Debit ${money(debit)}; kredit ${money(credit)}. Tidak ada nilai penyeimbang otomatis.`);
+   await checked(db().rpc("post_accounting_opening_balances",{
+    p_lines:postLines,p_supporting_source:source,p_reference_number:reference||null
+   }));
+   await loadData();$("#openingBalancesDialog").close();toast("Saldo awal berhasil diposting dan tercatat di buku besar.");
   }catch(err){error.textContent=err.message||"Saldo awal gagal disimpan.";error.classList.remove("hidden");}
   finally{if(button)button.disabled=false}
  });

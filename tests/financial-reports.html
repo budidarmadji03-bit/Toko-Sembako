@@ -181,6 +181,18 @@
         equal(model.inventoryLedger, 560);
         equal(model.profitAndLossRows.reduce((total, row) => total + row.amount, 0), 30);
       });
+      run("neraca saldo menampilkan saldo awal, mutasi, dan saldo akhir dari jurnal", () => {
+        const model = api.makeAccountingModel(accountingSource, { from: "2026-10-26", to: "2026-10-26" });
+        const cash = model.trialBalanceRows.find(row => row.code === "1010");
+        const totals = model.trialBalanceRows[model.trialBalanceRows.length - 1];
+        equal(cash.openingDebit, 1000);
+        equal(cash.movementDebit, 90);
+        equal(cash.movementCredit, 50);
+        equal(cash.endingDebit, 1040);
+        equal(totals.openingDebit, totals.openingCredit);
+        equal(totals.movementDebit, totals.movementCredit);
+        equal(totals.endingDebit, totals.endingCredit);
+      });
       run("jurnal tidak seimbang terdeteksi tanpa membuat akun penyeimbang", () => {
         const altered = { ...accountingFixture, lines: accountingFixture.lines.filter(line =>
           !(line.journal_entry_id === "expense-payment" && line.account_id === "bank")
@@ -196,6 +208,8 @@
         equal(model.hasOpening, false);
         equal(model.openingCash, null);
         equal(model.cashEnding, null);
+        equal(model.trialBalanceRows[0].openingDebit, null);
+        equal(model.trialBalanceRows[0].endingDebit, null);
       });
       run("periode yang seluruhnya sebelum cutover tidak ditampilkan sebagai saldo nol", () => {
         const model = api.makeAccountingModel(accountingSource, { from: "2026-10-19", to: "2026-10-25" });
