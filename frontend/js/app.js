@@ -344,7 +344,7 @@ function renderSalesReport(){
 function applyReportFilters(){try{renderSalesReport()}catch(error){toast(error.message||"Filter laporan tidak valid.",true)}}
 let pendingProductPhoto=null,removeProductPhoto=false;
 function renderPhotoPreview(photo){const preview=$("#productPhotoPreview"),image=$("#productPhotoPreviewImage");pendingProductPhoto=photo||null;image.src=photo||"";preview.classList.toggle("hidden",!photo);$("#removeProductPhoto").classList.toggle("hidden",!photo);$("#chooseProductPhoto").innerHTML=`<i class="fa-solid fa-camera"></i> ${photo?"Ganti foto":"Pilih foto"}`;}
-function openProduct(p=null){$("#productForm").reset();$("#productError").classList.add("hidden");$("#productId").value=p?p.id:"";$("#productModalTitle").textContent=p?"Edit barang":"Tambah barang";$("#stockQty").disabled=!!p;if(p){$("#sku").value=p.sku;$("#productName").value=p.nama;$("#productCategory").value=p.kategori;$("#unit").value=p.satuan;$("#buyPrice").value=p.harga_beli;$("#sellPrice").value=p.harga_jual;$("#stockQty").value=p.stok;$("#minStock").value=p.stok_minimum;}else{$("#stockQty").disabled=false;$("#stockQty").value=0;$("#minStock").value=5;}removeProductPhoto=false;renderPhotoPreview(p?.foto_url||null);$("#productDialog").showModal()}
+function openProduct(p=null){$("#productForm").reset();$("#productError").classList.add("hidden");$("#productId").value=p?p.id:"";$("#productModalTitle").textContent=p?"Edit barang":"Tambah barang";$("#stockQty").disabled=false;$("#stockQty").readOnly=true;if(p){$("#sku").value=p.sku;$("#productName").value=p.nama;$("#productCategory").value=p.kategori;$("#unit").value=p.satuan;$("#buyPrice").value=p.harga_beli;$("#sellPrice").value=p.harga_jual;$("#stockQty").value=p.stok;$("#minStock").value=p.stok_minimum;}else{$("#stockQty").value=0;$("#minStock").value=5;}removeProductPhoto=false;renderPhotoPreview(p?.foto_url||null);$("#productDialog").showModal()}
 function processProductPhoto(file){
  if(!file)return Promise.resolve(null);
  if(!["image/jpeg","image/png","image/webp"].includes(file.type))return Promise.reject(new Error("Format foto harus JPG, PNG, atau WebP."));
@@ -450,7 +450,7 @@ function parseProductCsv(text){
   if(!product.sku||product.sku.length>50)throw Error(`Baris ${line}: SKU wajib diisi dan maksimal 50 karakter.`);
   if(!product.nama||product.nama.length>150||!product.kategori||!product.satuan)throw Error(`Baris ${line}: nama, kategori, dan satuan wajib diisi.`);
   if([product.harga_beli,product.harga_jual,product.stok,product.stok_minimum].some(value=>!Number.isFinite(value)||value<0))throw Error(`Baris ${line}: harga dan stok harus berupa angka nol atau lebih.`);
-  if(product.stok!==0)throw Error(`Baris ${line}: stok awal CSV harus 0. Catat stok melalui saldo awal terverifikasi atau transaksi stok masuk.`);
+  if(product.stok!==0)throw Error(`Baris ${line}: barang baru harus diimpor dengan stok 0. Impor master barang dahulu, lalu catat jumlah yang diterima melalui menu Stok masuk.`);
   const key=product.sku.toLowerCase();if(skuSet.has(key))throw Error(`Baris ${line}: SKU "${product.sku}" sudah ada atau berulang.`);
   skuSet.add(key);return product;
  });
@@ -475,7 +475,7 @@ async function saveProduct(e){
  let uploaded=null,productSaved=false;
  try{
   const values=productFormData(),id=$("#productId").value,current=products.find(p=>String(p.id)===String(id));
-  if(!id&&values.stok!==0)throw Error("Barang baru harus dibuat dengan stok 0. Catat jumlah barang melalui stok masuk atau saldo awal terverifikasi.");
+  if(!id&&values.stok!==0)throw Error("Barang baru harus dibuat dengan stok 0. Simpan master barang dahulu, lalu catat jumlah yang diterima melalui menu Stok masuk.");
   if(current&&Number(current.stok)>0&&accountingData.settings?.opening_entry_id&&Number(values.harga_beli)!==Number(current.harga_beli))throw Error("Biaya rata-rata barang dengan stok tidak dapat diubah langsung setelah saldo awal dicatat. Catat stok masuk atau jurnal koreksi.");
   if(products.some(p=>p.sku.toLowerCase()===values.sku.toLowerCase()&&String(p.id)!==String(id)))throw Error("SKU sudah digunakan.");
   let fotoUrl=removeProductPhoto?null:current?.foto_url||null;
