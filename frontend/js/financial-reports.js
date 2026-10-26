@@ -434,6 +434,22 @@
     return `<table class="data-table"><thead><tr>${headings.map(value => `<th>${escapeHtml(value)}</th>`).join("")}</tr></thead><tbody>${rows.map(renderRow).join("")}</tbody></table>`;
   }
 
+  function comparisonChart(rows, label) {
+    const available = rows.filter(row => Number.isFinite(row.value));
+    if (!available.length) return '<p class="report-chart-empty">Grafik belum tersedia karena data laporan belum lengkap.</p>';
+    const maximum = Math.max(...available.map(row => Math.abs(row.value)), 1);
+    return `<div class="report-comparison-chart" role="img" aria-label="${escapeHtml(label)}">${rows.map(row => {
+      const hasValue = Number.isFinite(row.value);
+      const width = hasValue ? Math.abs(row.value) / maximum * 100 : 0;
+      const tone = hasValue && row.value < 0 ? "negative" : row.tone || "positive";
+      return `<div class="report-bar-row">
+        <span class="report-bar-label">${escapeHtml(row.label)}</span>
+        <span class="report-bar-track"><span class="report-bar-fill ${tone}" style="width:${width}%"></span></span>
+        <b class="report-bar-value">${hasValue ? escapeHtml(currency(row.value)) : "Belum tersedia"}</b>
+      </div>`;
+    }).join("")}</div>`;
+  }
+
   function updateFilterOptions(source) {
     const options = [
       ["#reportProductFilter", "Semua barang", [...new Map(source.products.map(row => [String(row.id), row])).values()]
@@ -610,6 +626,25 @@
     if (incomeNode) incomeNode.innerHTML = table(incomeRows, ["Keterangan", "Nominal"], row =>
       `<tr><td class="${row[0].includes("tercatat") ? "bold" : ""}">${escapeHtml(row[0])}</td><td>${row[1] == null ? "Tidak tersedia" : typeof row[1] === "number" ? currency(row[1]) : escapeHtml(String(row[1]))}</td></tr>`,
     "Belum ada transaksi pada periode ini");
+    const incomeChartNode = document.querySelector("#incomeStatementChart");
+    if (incomeChartNode) {
+      const reportedNetProfit = accounting.error
+        ? model.netProfit
+        : sum(accounting.profitAndLossRows, row => row.amount);
+      incomeChartNode.innerHTML = comparisonChart([
+        { label: "Penjualan setelah diskon", value: model.netSales, tone: "blue" },
+        { label: "Harga pokok penjualan", value: model.cogs, tone: "purple" },
+        { label: "Laba kotor", value: model.grossProfit, tone: "green" },
+        { label: "Beban operasional", value: model.expenseTotal, tone: "orange" },
+        { label: "Laba bersih", value: reportedNetProfit, tone: "navy" }
+      ], "Perbandingan penjualan setelah diskon, HPP, laba kotor, beban operasional, dan laba bersih untuk periode laporan.");
+      const note = incomeChartNode.nextElementSibling;
+      if (note?.classList.contains("report-chart-note")) {
+        note.textContent = accounting.error
+          ? "Ringkasan operasional; angka laba bersih jurnal belum tersedia. Nilai HPP atau laba dapat belum lengkap."
+          : "Perbandingan nilai laporan pada periode terpilih, bukan komponen yang dijumlahkan. Laba bersih mengikuti jurnal; penjualan dan HPP mengikuti detail transaksi.";
+      }
+    }
     const incomeHeading = document.querySelector("#incomeStatement")?.closest(".panel")?.querySelector(".panel-head p");
     if (incomeHeading) incomeHeading.textContent = accounting.error
       ? accounting.unavailableBeforeCutover
@@ -696,6 +731,17 @@
       : table(balanceRows, ["Kelompok", "Kode", "Akun", "Saldo (Rp)"], row =>
         `<tr class="${String(row[0]).startsWith("TOTAL") || row[0] === "SELISIH NERACA" ? "bold" : ""}"><td>${escapeHtml(row[0])}</td><td>${escapeHtml(row[1])}</td><td>${escapeHtml(row[2])}</td><td>${currency(row[3])}</td></tr>`,
       "Belum ada saldo buku pada tanggal laporan");
+    const balanceChartNode = document.querySelector("#balanceSheetChart");
+    if (balanceChartNode) {
+      balanceChartNode.innerHTML = accounting.error
+        ? `<p class="report-chart-empty">${escapeHtml(accounting.error)}</p>`
+        : comparisonChart([
+          { label: "Total aset", value: accounting.assetTotal, tone: "blue" },
+          { label: "Total liabilitas", value: accounting.liabilityTotal, tone: "orange" },
+          { label: "Total ekuitas", value: accounting.equityTotal, tone: "purple" },
+          { label: "Selisih neraca", value: accounting.balanceDifference, tone: "green" }
+        ], "Perbandingan total aset, liabilitas, ekuitas, dan selisih neraca berdasarkan jurnal tercatat.");
+    }
     const trialBalanceNode = document.querySelector("#trialBalanceTable");
     if (trialBalanceNode) trialBalanceNode.innerHTML = accounting.error
       ? `<div class="report-limitation">${escapeHtml(accounting.error)}</div>`
@@ -1022,14 +1068,20 @@
         const section = document.createElement("article");
         section.id = id;
         section.className = "panel section-gap";
-        const chart = id === "cashFlowStatement"
-          ? '<div id="cashFlowStatementChart" class="cashflow-chart-container"></div>'
-          : "";
+        const chart = {
+          incomeStatement: '<div id="incomeStatementChart" class="report-chart-container"></div><p class="report-chart-note"></p>',
+          cashFlowStatement: '<div id="cashFlowStatementChart" class="cashflow-chart-container"></div>',
+          balanceSheet: '<div id="balanceSheetChart" class="report-chart-container"></div>'
+        }[id] || "";
         section.innerHTML = `<div class="panel-head"><div><h2>${heading}</h2><p>${content}</p></div></div>${chart}<div id="${id}Table" class="table-scroll"></div><div id="${id}Warning" class="report-limitation section-gap hidden"></div>`;
         after.insertAdjacentElement("afterend", section);
         return section;
       };
       const income = page.querySelector("#incomeStatement")?.closest(".panel");
+      if (income && !page.querySelector("#incomeStatementChart")) {
+        income.querySelector(".panel-head")?.insertAdjacentHTML("afterend",
+          '<div id="incomeStatementChart" class="report-chart-container"></div><p class="report-chart-note"></p>');
+      }
       const cash = addStatement("cashFlowStatement", "Laporan arus kas", "Mutasi kas dan bank dari jurnal pembayaran; grafik menunjukkan perubahan bersih per bulan, bukan saldo akhir karena saldo awal harus diverifikasi.", income || totals);
       const balance = addStatement("balanceSheet", "Neraca", "Saldo akun per akhir periode; laporan ditandai belum lengkap sampai saldo awal diverifikasi.", cash);
       balance.insertAdjacentHTML("beforeend", '<div class="section-gap"><div class="panel-head"><div><h3>Neraca saldo / mutasi buku besar</h3><p>Saldo pembukaan, mutasi debit-kredit sejak cutover, dan saldo akhir menurut jurnal.</p></div></div><div id="trialBalanceTable" class="table-scroll"></div></div>');

@@ -289,5 +289,15 @@ body {
 .cashflow-chart-bar.positive{background:#16a36a}
 .cashflow-chart-bar.negative{background:#e05252}
 .cashflow-chart-value{text-align:right;font-variant-numeric:tabular-nums;color:#40394e}
+.report-chart-container{margin:16px 0 8px;padding:16px;border:1px solid #e8e5ef;border-radius:12px;background:#fcfbff}
+.report-comparison-chart{display:grid;gap:14px}
+.report-bar-row{display:grid;grid-template-columns:minmax(150px,210px) minmax(80px,1fr) minmax(110px,150px);gap:12px;align-items:center;font-size:12px}
+.report-bar-label{color:#514a60;font-weight:600}
+.report-bar-track{height:16px;overflow:hidden;border-radius:5px;background:#f0eef5}
+.report-bar-fill{display:block;height:100%;min-width:0;border-radius:5px;transition:width .25s ease}
+.report-bar-fill.blue{background:#4889e8}.report-bar-fill.purple{background:#8863d8}.report-bar-fill.green,.report-bar-fill.positive{background:#16a36a}.report-bar-fill.orange{background:#eb9b35}.report-bar-fill.navy{background:#526782}.report-bar-fill.negative{background:#e05252}
+.report-bar-value{text-align:right;font-variant-numeric:tabular-nums;color:#40394e}
+.report-chart-note{margin:0 2px 14px;color:#746d80;font-size:11px;line-height:1.6}
 .report-chart-empty{margin:0;color:#746d80;font-size:12px}
+@media(max-width:520px){.report-chart-container{padding:12px}.report-bar-row{grid-template-columns:minmax(0,1fr) minmax(90px,1fr);gap:6px 10px}.report-bar-track{grid-column:1}.report-bar-value{grid-column:2;grid-row:2;font-size:11px}}
 @media(max-width:520px){.cashflow-chart-container{padding:12px}.cashflow-chart-row{grid-template-columns:75px minmax(70px,1fr);gap:8px}.cashflow-chart-value{grid-column:2;text-align:left;font-size:11px}}
