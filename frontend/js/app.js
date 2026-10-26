@@ -750,5 +750,6 @@ async function init(){
  });
  window.addEventListener("focus",()=>loadData().catch(error=>{statusConnection(false);window.RetailFinancialReports?.setError(error.message);toast("Sinkronisasi Supabase gagal: "+error.message,true)}));
 }
-document.addEventListener("DOMContentLoaded",init);
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});
+else init();
 })();
