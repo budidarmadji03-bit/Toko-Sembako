@@ -111,7 +111,7 @@
       status:statusLabel(order),deliveryAddress:order.delivery_address||"",
       deliveryDate:order.tanggal_pengiriman?new Date(order.tanggal_pengiriman).toLocaleString("id-ID"):"",
       items:order.items,subtotal:order.subtotal,discount:order.diskon,total:order.total,
-      paid:order.jumlah_dibayar,change:order.kembalian,footer:"Terima kasih telah berbelanja di Toko Budi Sembako."
+      paid:order.jumlah_dibayar,change:order.kembalian,footer:"Terima kasih telah berbelanja di Toko Sembako Budi."
     });
   }
   async function checkout(){

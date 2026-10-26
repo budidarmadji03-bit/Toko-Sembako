@@ -1225,7 +1225,7 @@
       payment.source_id, payment.journal_entry_id
     ]) : [["", "Riwayat pembayaran belum tersedia", "", "", "", ""]];
     const current = [
-      { name: activeTab === "Ringkasan" ? "Ringkasan" : activeTab, rows: sheetRows(`${activeTab} — Toko Budi Sembako`, ["Indikator", "Nilai"], [
+      { name: activeTab === "Ringkasan" ? "Ringkasan" : activeTab, rows: sheetRows(`${activeTab} — Toko Sembako Budi`, ["Indikator", "Nilai"], [
         ["Jumlah transaksi selesai", model.completed.length], ["Penjualan bruto", model.subtotal],
         ["Diskon", model.discount], ["Penjualan setelah diskon (belum dikurangi retur)", model.netSales ?? "Tidak tersedia"],
         ["HPP operasional", model.cogs ?? "Tidak tersedia"], ["Arus kas bersih jurnal", ledger?.netCashChange ?? "Tidak tersedia"],
@@ -1292,7 +1292,7 @@
         ["Transaksi historis sebelum cutover", "Tidak direkonstruksi"]
       ])) },
       { name: "Metadata", rows: sheetRows("Metadata Ekspor", ["Kolom", "Nilai"], [
-        ["Nama toko", "Toko Budi Sembako"], ["Tanggal mulai", model.period.from || "Awal data"],
+        ["Nama toko", "Toko Sembako Budi"], ["Tanggal mulai", model.period.from || "Awal data"],
         ["Tanggal akhir", model.period.to || "Hari ini"], ["Zona waktu", TIME_ZONE],
         ["Tanggal ekspor UTC", new Date().toISOString()],
         ["Tanggal cutover akuntansi", ledger?.cutoverDate ?? "Migrasi belum diterapkan"],

@@ -40,7 +40,7 @@
     root.id = "retail-print-root";
     root.setAttribute("aria-label", "Nota untuk dicetak");
     root.innerHTML = `
-      <header><h1>${escapeHtml(receipt.shopName || "Toko Budi Sembako")}</h1><p>BUKTI TRANSAKSI</p></header>
+      <header><h1>${escapeHtml(receipt.shopName || "Toko Sembako Budi")}</h1><p>BUKTI TRANSAKSI</p></header>
       <hr class="rule"><div class="detail"><span>Nomor</span><b>${escapeHtml(receipt.invoice)}</b></div>
       <div class="detail"><span>Tanggal</span><b>${escapeHtml(receipt.date)}</b></div>${details}
       <hr class="rule"><table><thead><tr><th>Barang</th><th class="number">Jumlah</th><th class="number">Total</th></tr></thead><tbody>${rows}</tbody></table>

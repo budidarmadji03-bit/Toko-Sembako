@@ -1,6 +1,6 @@
-## [Buka Demo Aplikasi Toko Budi Sembako](https://budidarmadji03-bit.github.io/Toko-Sembako/)
+## [Buka Demo Aplikasi Toko Sembako Budi](https://budidarmadji03-bit.github.io/Toko-Sembako/)
 
-# Toko Budi Sembako
+# Toko Sembako Budi
 
 **Nama:** Budi Austiano Darmadji
 
@@ -18,7 +18,7 @@
 
 ## Penjelasan Sistem
 
-Toko Budi Sembako adalah aplikasi sistem informasi untuk membantu kegiatan operasional toko, mulai dari pengelolaan barang dan persediaan, transaksi penjualan, pencatatan pelanggan, hingga pemantauan ringkasan keuangan. Aplikasi menyediakan dashboard untuk melihat aktivitas toko dan peringatan stok.
+Toko Sembako Budi adalah aplikasi sistem informasi untuk membantu kegiatan operasional toko, mulai dari pengelolaan barang dan persediaan, transaksi penjualan, pencatatan pelanggan, hingga pemantauan ringkasan keuangan. Aplikasi menyediakan dashboard untuk melihat aktivitas toko dan peringatan stok.
 
 Login Owner dan Pelanggan menggunakan Supabase Auth dan role dari `public.profiles`. Data operasional disimpan di Supabase PostgreSQL, transaksi kasir/stok/pesanan menggunakan RPC transaksional, dan foto produk disimpan di Supabase Storage.
 
