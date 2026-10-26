@@ -833,6 +833,15 @@
       packageExport.id = "exportPackageExcel";
       packageExport.className = "btn-primary";
       packageExport.innerHTML = '<i class="fa-solid fa-file-excel"></i> Ekspor paket (.xlsx)';
+      const simulationLink = document.createElement("a");
+      simulationLink.id = "openFinancialSimulation";
+      simulationLink.className = "btn-secondary";
+      simulationLink.href = new URL("financial-simulation.html", window.location.href).href;
+      simulationLink.target = "_blank";
+      simulationLink.rel = "noopener noreferrer";
+      simulationLink.setAttribute("aria-label", "Buka laporan SIMULASI/PENGUJIAN, terpisah dari data produksi");
+      simulationLink.title = "Fixture lokal tanpa koneksi atau perubahan database";
+      simulationLink.innerHTML = '<i class="fa-solid fa-flask"></i> Simulasi laporan (data uji)';
       const opening = document.createElement("button");
       opening.type = "button";
       opening.id = "openOpeningBalances";
@@ -854,7 +863,7 @@
           const reportExport = actions.querySelector("#exportSalesExcel");
           reportExport?.classList.replace("btn-primary", "btn-secondary");
           if (reportExport) reportExport.innerHTML = '<i class="fa-solid fa-file-excel"></i> Ekspor laporan (.xlsx)';
-        actions.append(opening, journal, reconciliation, refresh, print, packageExport);
+        actions.append(simulationLink, opening, journal, reconciliation, refresh, print, packageExport);
       }
     }
     const oldNotice = page.querySelector(".demo-data-notice:not(#legacyCostNotice):not(#reportDataError)");
