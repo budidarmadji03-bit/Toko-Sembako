@@ -96,7 +96,7 @@ async function loadData(){
   try{openingDraft=await checked(client.from("accounting_opening_drafts").select("*").eq("id",true).maybeSingle())}
   catch(error){openingDraftError=`Fitur draft saldo awal belum tersedia; jalankan migrasi backend/sql/11_opening_balance_drafts.sql. ${error.message||""}`}
   return {settings,accounts,entries,lines,payments,reconciliations,openingDraft,openingDraftError,error:""};
- })).catch(error=>({
+ }).catch(error=>({
   settings:null,accounts:[],entries:[],lines:[],payments:[],reconciliations:[],openingDraft:null,openingDraftError:"",
   error:`Akuntansi belum tersedia: ${error.message||"migrasi atau akses Owner belum siap."}`
  }));
