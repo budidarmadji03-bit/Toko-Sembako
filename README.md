@@ -61,8 +61,6 @@ Filter tanggal dan jurnal memakai zona waktu `Asia/Jakarta`; pertumbuhan volume 
 - Laporan arus kas menampilkan grafik perubahan bersih kas/bank per bulan dari jurnal dalam periode filter. Jurnal nonkas dikecualikan; grafik bukan saldo rekening dan tidak mengasumsikan saldo awal.
 - File memakai `xlsx-js-style` melalui CDN; ekspor membutuhkan library tersebut dan koneksi yang dapat memuatnya. Workbook memberi format judul/header, mata uang, lebar kolom, dan filter otomatis; tidak ada formula spreadsheet yang dibentuk dari input pengguna.
 - Jalankan uji fixture tanpa database melalui `tests/financial-reports.html`; fixture tidak dikirim ke Supabase. Uji meliputi perhitungan operasional, jurnal, arus kas, perubahan kas bulanan, neraca, selisih, saldo awal yang hilang, dan periode sebelum cutover.
-- Untuk skenario sintetis 23–25 Oktober 2026, buka `frontend/html/financial-simulation.html` secara lokal atau melalui tautan **Simulasi laporan (data uji)** pada laporan Owner di web. Fixture memakai model perhitungan yang sama, menampilkan ringkasan laba rugi, arus kas, neraca, rekonsiliasi, grafik kas harian, rincian transaksi, dan ekspor CSV. Semua saldo/jurnal berlabel `SIMULASI/PENGUJIAN`; halaman tidak memuat klien Supabase dan tidak menulis ke database. Cutover produksi tidak diubah. Ini bukan pembukuan nyata dan tidak menggantikan QA integrasi, RLS, atau uji unduhan Excel live.
-- `tests/financial-reports-simulation.html` mengarahkan ke fixture di `frontend`, sebab GitHub Pages hanya menerbitkan folder `frontend`. Fixture tidak menjadi bagian buku besar produksi; seluruh nilainya sintetis.
 - QA staging yang masih wajib: uji migrasi 09 dan 10 pada Supabase staging, hak akses Owner/customer, jurnal tak seimbang, posting penjualan/stok/beban, pembayaran tunai/digital dan bertahap, pembelian/beban tunai-kredit, pembayaran utang, refund, rekonsiliasi bank dan stok, serta ekspor dengan Excel. Jangan membuat transaksi uji pada data produksi.
 
 ## ERD Inti (3 Entitas)
@@ -128,7 +126,6 @@ erDiagram
 │   │   └── style.css          # Tampilan dan tata letak responsif
 │   ├── html/
 │   │   ├── index.html         # Halaman utama aplikasi
-│   │   ├── financial-simulation.html # Laporan simulasi terpisah, data sintetis
 │   │   ├── login.html         # Login Supabase dan registrasi pelanggan
 │   │   ├── customer.html      # Katalog dan pesanan pelanggan dengan akun
 │   │   └── customer-guest.html # Katalog/checkout Supabase tanpa akun pelanggan
