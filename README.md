@@ -42,6 +42,7 @@ Login Owner dan Pelanggan menggunakan Supabase Auth dan role dari `public.profil
 ## Logika Akuntansi
 
 - Terapkan migrasi `backend/sql/09_accounting_ledger.sql` setelah migrasi 01–08. Migrasi menambahkan COA, jurnal dan baris debit-kredit, pencatatan pembayaran, saldo awal, dan rekonsiliasi. Jurnal immutable dan harus seimbang; fungsi tulis dibatasi ke Owner.
+- Jika migrasi 09 sudah diterapkan, jalankan juga `backend/sql/10_fix_accounting_journal_trigger.sql`. Migrasi ini memperbaiki trigger validasi jurnal yang sebelumnya dapat membatalkan posting dengan error `record "new" has no field "journal_entry_id"`; migrasi tidak mengubah transaksi/jurnal yang sudah tersimpan.
 - **Cutover:** default tanggal 26 Oktober 2026. Transaksi historis tidak direkonstruksi karena data penyelesaian pembayaran dan saldo pembukaan tidak tersedia. Data lama tidak dihapus atau diberi metode pembayaran/utang rekaan. Kolom pembayaran pembelian/beban lama tetap `NULL` (belum diketahui); transaksi tersebut tidak dapat dilunasi melalui ledger tanpa bukti saldo.
 - **Saldo awal:** setelah migrasi, buka Laporan → **Saldo awal** dan masukkan nilai kas, bank, persediaan, piutang, utang, dan ekuitas yang didukung dokumen. Debit harus sama dengan kredit; sistem tidak membuat akun penyeimbang. Neraca dan saldo kas tetap berstatus belum lengkap bila saldo awal belum dicatat.
 - **Penjualan selesai:** jurnal akrual mencatat piutang, penjualan bruto, diskon, HPP snapshot, dan pengurangan persediaan. Pembayaran kasir dicatat terpisah dari penjualan kredit. Pesanan antar diakui sebagai penjualan saat statusnya selesai, tetapi tidak otomatis dianggap lunas. Catat penerimaan piutang secara terpisah. Pembatalan setelah cutover membuat jurnal balik; refund yang belum dibayar tercatat sebagai utang refund.
@@ -60,7 +61,7 @@ Filter tanggal dan jurnal memakai zona waktu `Asia/Jakarta`; pertumbuhan volume 
 - Laporan arus kas menampilkan grafik perubahan bersih kas/bank per bulan dari jurnal dalam periode filter. Jurnal nonkas dikecualikan; grafik bukan saldo rekening dan tidak mengasumsikan saldo awal.
 - File memakai `xlsx-js-style` melalui CDN; ekspor membutuhkan library tersebut dan koneksi yang dapat memuatnya. Workbook memberi format judul/header, mata uang, lebar kolom, dan filter otomatis; tidak ada formula spreadsheet yang dibentuk dari input pengguna.
 - Jalankan uji fixture tanpa database melalui `tests/financial-reports.html`; fixture tidak dikirim ke Supabase. Uji meliputi perhitungan operasional, jurnal, arus kas, perubahan kas bulanan, neraca, selisih, saldo awal yang hilang, dan periode sebelum cutover.
-- QA staging yang masih wajib: uji migrasi pada Supabase staging, hak akses Owner/customer, jurnal tak seimbang, pembayaran tunai/digital dan bertahap, pembelian/beban tunai-kredit, pembayaran utang, refund, rekonsiliasi bank dan stok, serta ekspor dengan Excel. Jangan membuat transaksi uji pada data produksi.
+- QA staging yang masih wajib: uji migrasi 09 dan 10 pada Supabase staging, hak akses Owner/customer, jurnal tak seimbang, posting penjualan/stok/beban, pembayaran tunai/digital dan bertahap, pembelian/beban tunai-kredit, pembayaran utang, refund, rekonsiliasi bank dan stok, serta ekspor dengan Excel. Jangan membuat transaksi uji pada data produksi.
 
 ## ERD Inti (3 Entitas)
 
