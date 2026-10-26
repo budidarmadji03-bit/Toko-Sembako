@@ -9,7 +9,8 @@
     PROFILE_SCHEMA_MISSING: "Tabel public.profiles belum tersedia. Administrator harus menjalankan migrasi backend/sql sebelum login.",
     ROLE_INVALID: "Role pengguna belum dikonfigurasi. Minta administrator menetapkan role owner atau customer di public.profiles.",
     PROFILE_READ_FAILED: "Profil gagal dibaca. Periksa koneksi, tabel public.profiles, dan kebijakan RLS.",
-    AUTH_SESSION_INVALID: "Sesi tidak dapat diverifikasi. Silakan masuk kembali."
+    AUTH_SESSION_INVALID: "Sesi tidak dapat diverifikasi. Silakan masuk kembali.",
+    AUTH_CONNECTION_TIMEOUT: "Pemeriksaan sesi Supabase terlalu lama. Data Anda tidak dihapus. Silakan masuk kembali; jika gagal, periksa koneksi internet lalu coba lagi."
   };
 
   function showForm(form) {
@@ -33,6 +34,14 @@
     if (button.id === "loginButton") {
       $("#loginButtonText").textContent = busy ? busyText : "Masuk";
     }
+  }
+
+  function withTimeout(promise,milliseconds,message){
+    let timeout;
+    return Promise.race([
+      promise,
+      new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error(message)),milliseconds)})
+    ]).finally(()=>clearTimeout(timeout));
   }
 
   async function redirectForRole(user, messageElement) {
@@ -94,7 +103,11 @@
         showForm("#setPasswordForm");
         return;
       }
-      const currentUser = await auth.getCurrentUser();
+      const currentUser = await withTimeout(
+        auth.getCurrentUser(),
+        12000,
+        noticeMessages.AUTH_CONNECTION_TIMEOUT
+      );
       if (currentUser) await redirectForRole(currentUser, $("#loginMessage"));
     } catch (error) {
       showMessage($("#loginMessage"), error.message || "Status login tidak dapat diperiksa.");

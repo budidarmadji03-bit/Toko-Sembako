@@ -64,6 +64,13 @@ async function fetchAll(query){
 function toast(msg,error=false){const e=$("#toast");e.textContent=msg;e.className="toast show"+(error?" error":"");clearTimeout(toastTimer);toastTimer=setTimeout(()=>e.className="toast",3500)}
 function empty(title,desc){return `<div class="empty"><i class="fa-solid fa-box-open"></i><b>${title}</b><p>${desc}</p></div>`}
 function statusConnection(connected=true){const status=$("#connectionStatus");status.textContent=connected?"Terhubung ke Supabase":"Supabase tidak terhubung";status.style.color=connected?"#16a34a":"#dc2626";const label=$("#connectionLabel");if(label)label.innerHTML=`<i class="fa-solid ${connected?"fa-cloud":"fa-triangle-exclamation"}"></i><b>${connected?"Supabase":"Koneksi gagal"}</b>`;}
+function withTimeout(promise,milliseconds,message){
+ let timeout;
+ return Promise.race([
+  promise,
+  new Promise((_,reject)=>{timeout=setTimeout(()=>{const error=new Error(message);error.code="AUTH_CONNECTION_TIMEOUT";reject(error)},milliseconds)})
+ ]).finally(()=>clearTimeout(timeout));
+}
 async function loadData(){
  window.RetailFinancialReports?.setLoading();
  let client;
@@ -725,10 +732,10 @@ async function logout(){
 }
 async function init(){
  let user;
- try{user=await window.RetailAuth.getCurrentUser();}
+ try{user=await withTimeout(window.RetailAuth.getCurrentUser(),12000,"Pemeriksaan sesi Supabase terlalu lama. Masuk kembali; data transaksi Anda tidak dihapus.");}
  catch(error){
   const url=new URL("login.html",location.href);
-  if(error.code)url.searchParams.set("notice",error.code);
+  url.searchParams.set("notice",error.code==="AUTH_CONNECTION_TIMEOUT"?"AUTH_CONNECTION_TIMEOUT":error.code||"AUTH_SESSION_INVALID");
   location.replace(url);
   return;
  }
