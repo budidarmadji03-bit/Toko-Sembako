@@ -197,6 +197,30 @@
         equal(model.openingCash, null);
         equal(model.cashEnding, null);
       });
+      run("grafik perubahan kas bulanan memakai jurnal aktual dan mengabaikan jurnal nonkas", () => {
+        const altered = {
+          ...accountingFixture,
+          entries: [
+            ...accountingFixture.entries,
+            { id: "nov-expense-payment", entry_date: "2026-11-02", cash_flow_activity: "operating" },
+            { id: "nov-opening-adjustment", entry_date: "2026-11-03", cash_flow_activity: "noncash" }
+          ],
+          lines: [
+            ...accountingFixture.lines,
+            { journal_entry_id: "nov-expense-payment", account_id: "bank", debit: 0, credit: 20 },
+            { journal_entry_id: "nov-expense-payment", account_id: "expensePayable", debit: 20, credit: 0 },
+            { journal_entry_id: "nov-opening-adjustment", account_id: "cash", debit: 500, credit: 0 },
+            { journal_entry_id: "nov-opening-adjustment", account_id: "capital", debit: 0, credit: 500 }
+          ]
+        };
+        const data = { ...altered, accounting: altered };
+        const model = api.makeAccountingModel(data, { from: "2026-10-26", to: "2026-11-30" });
+        equal(model.monthlyCashChanges.length, 2);
+        equal(model.monthlyCashChanges[0].month, "2026-10");
+        equal(model.monthlyCashChanges[0].net, 130);
+        equal(model.monthlyCashChanges[1].month, "2026-11");
+        equal(model.monthlyCashChanges[1].net, -20);
+      });
     })();
   </script>
 </body>

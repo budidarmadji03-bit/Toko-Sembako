@@ -277,3 +277,15 @@ body {
 @media print{.sidebar,.topbar,.report-tabs,.page-actions,.report-toolbar,#addExpense,.footer{display:none!important}.content{padding:0!important}.page{display:block!important}.report-section-anchor{break-inside:avoid}.panel{box-shadow:none!important;border:1px solid #ccc!important}}
 .delivery-actions{display:grid;gap:6px;min-width:130px}.delivery-status-action{justify-content:center;padding:7px 9px;font-size:10px;white-space:nowrap}.delivery-status-action.danger{color:#b91c1c;border-color:#fecaca;background:#fff7f7}.delivery-status-action.danger:hover{background:#fee2e2}
 .guest-track-input{flex:1;min-width:180px}
+.cashflow-chart-container{margin:16px 0 22px;padding:16px;border:1px solid #e8e5ef;border-radius:12px;background:#fcfbff}
+.cashflow-chart{display:grid;gap:12px}
+.cashflow-chart-row{display:grid;grid-template-columns:minmax(95px,125px) minmax(100px,1fr) minmax(105px,150px);gap:12px;align-items:center;font-size:12px}
+.cashflow-chart-month{color:#625b70;font-weight:600}
+.cashflow-chart-track{position:relative;height:18px;border-radius:5px;background:#f0eef5}
+.cashflow-chart-zero{position:absolute;left:50%;top:0;bottom:0;width:1px;background:#a8a2b3}
+.cashflow-chart-bar{position:absolute;top:3px;height:12px;border-radius:4px}
+.cashflow-chart-bar.positive{background:#16a36a}
+.cashflow-chart-bar.negative{background:#e05252}
+.cashflow-chart-value{text-align:right;font-variant-numeric:tabular-nums;color:#40394e}
+.report-chart-empty{margin:0;color:#746d80;font-size:12px}
+@media(max-width:520px){.cashflow-chart-container{padding:12px}.cashflow-chart-row{grid-template-columns:75px minmax(70px,1fr);gap:8px}.cashflow-chart-value{grid-column:2;text-align:left;font-size:11px}}

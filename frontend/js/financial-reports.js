@@ -280,6 +280,7 @@
     const cashAccounts = accounts.filter(account => account.is_cash_equivalent);
     const cashMovement = new Map();
     const cashByMethod = new Map();
+    const monthlyCashChanges = new Map();
     for (const entry of entryInPeriod) {
       const entryLines = linesByEntry.get(String(entry.id)) || [];
       const net = sum(entryLines.filter(line =>
@@ -290,6 +291,10 @@
       if (net >= 0) totals.inflow += net;
       else totals.outflow += Math.abs(net);
       cashMovement.set(activity, totals);
+      if (activity !== "noncash" && net !== 0) {
+        const month = String(entry.entry_date).slice(0, 7);
+        monthlyCashChanges.set(month, (monthlyCashChanges.get(month) || 0) + net);
+      }
     }
     const periodPayments = payments.filter(payment =>
       payment.payment_date >= startDate && payment.payment_date <= endDate
@@ -367,6 +372,9 @@
       openingCash: hasOpening ? openingCash : null,
       cashEnding: hasOpening ? cashEnding : null,
       activityRows, netCashChange,
+      monthlyCashChanges: [...monthlyCashChanges.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([month, net]) => ({ month, net: roundMoney(net) })),
       cashByMethod: [...cashByMethod.entries()].map(([method, totals]) => ({ method, ...totals })),
       inventoryActual, inventoryLedger, inventoryComparable, inventoryDifference,
       reconciliationRows, paymentPostingDifference,
@@ -542,6 +550,33 @@
       ["Saldo kas/bank akhir", accounting.cashEnding]
     ];
     const cashFlowNode = document.querySelector("#cashFlowStatementTable");
+    const cashChartNode = document.querySelector("#cashFlowStatementChart");
+    if (cashChartNode) {
+      if (accounting.error) {
+        cashChartNode.innerHTML = "";
+        cashChartNode.classList.add("hidden");
+      } else {
+        const rows = accounting.monthlyCashChanges || [];
+        if (!rows.length) {
+          cashChartNode.innerHTML = '<p class="report-chart-empty">Belum ada mutasi kas/bank berjurnal pada periode ini.</p>';
+        } else {
+          const maxAbsolute = Math.max(...rows.map(row => Math.abs(row.net)), 1);
+          cashChartNode.innerHTML = `<div class="cashflow-chart" role="img" aria-label="Grafik perubahan bersih kas dan bank per bulan; tidak termasuk jurnal nonkas dan tidak mengasumsikan saldo awal.">${rows.map(row => {
+            const width = Math.min(50, Math.abs(row.net) / maxAbsolute * 50);
+            const positive = row.net >= 0;
+            const monthLabel = new Intl.DateTimeFormat("id-ID", {
+              month: "short", year: "numeric", timeZone: TIME_ZONE
+            }).format(new Date(`${row.month}-01T12:00:00+07:00`));
+            return `<div class="cashflow-chart-row" aria-label="${escapeHtml(monthLabel)}: ${escapeHtml(currency(row.net))}">
+              <span class="cashflow-chart-month">${escapeHtml(monthLabel)}</span>
+              <span class="cashflow-chart-track"><span class="cashflow-chart-zero"></span><span class="cashflow-chart-bar ${positive ? "positive" : "negative"}" style="left:${positive ? 50 : 50 - width}%;width:${width}%"></span></span>
+              <b class="cashflow-chart-value">${escapeHtml(currency(row.net))}</b>
+            </div>`;
+          }).join("")}</div>`;
+        }
+        cashChartNode.classList.remove("hidden");
+      }
+    }
     if (cashFlowNode) cashFlowNode.innerHTML = accounting.error
       ? `<div class="report-limitation">${escapeHtml(accounting.error)}</div>`
       : table(cashFlowRows, ["Arus kas", "Nominal (Rp)"], row =>
@@ -892,12 +927,15 @@
         const section = document.createElement("article");
         section.id = id;
         section.className = "panel section-gap";
-        section.innerHTML = `<div class="panel-head"><div><h2>${heading}</h2><p>${content}</p></div></div><div id="${id}Table" class="table-scroll"></div><div id="${id}Warning" class="report-limitation section-gap hidden"></div>`;
+        const chart = id === "cashFlowStatement"
+          ? '<div id="cashFlowStatementChart" class="cashflow-chart-container"></div>'
+          : "";
+        section.innerHTML = `<div class="panel-head"><div><h2>${heading}</h2><p>${content}</p></div></div>${chart}<div id="${id}Table" class="table-scroll"></div><div id="${id}Warning" class="report-limitation section-gap hidden"></div>`;
         after.insertAdjacentElement("afterend", section);
         return section;
       };
       const income = page.querySelector("#incomeStatement")?.closest(".panel");
-      const cash = addStatement("cashFlowStatement", "Laporan arus kas", "Mutasi kas dan bank dari jurnal pembayaran; QRIS/kartu debit diasumsikan masuk bank pada tanggal transaksi.", income || totals);
+      const cash = addStatement("cashFlowStatement", "Laporan arus kas", "Mutasi kas dan bank dari jurnal pembayaran; grafik menunjukkan perubahan bersih per bulan, bukan saldo akhir karena saldo awal harus diverifikasi.", income || totals);
       const balance = addStatement("balanceSheet", "Neraca", "Saldo akun per akhir periode; laporan ditandai belum lengkap sampai saldo awal diverifikasi.", cash);
       addStatement("accountingReconciliation", "Rekonsiliasi", "Periksa keseimbangan jurnal, saldo persediaan, mutasi pembayaran, serta saldo kas/bank dibandingkan rekening koran.", balance);
       const tabTargets = tabs.querySelectorAll("[data-report-target]");

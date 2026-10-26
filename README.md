@@ -56,8 +56,9 @@ Filter tanggal dan jurnal memakai zona waktu `Asia/Jakarta`; pertumbuhan volume 
 ### Ekspor dan uji laporan
 
 - Tombol **Ekspor laporan (.xlsx)** mengekspor bagian laporan aktif dengan filter aktif. **Ekspor paket (.xlsx)** membuat worksheet `Ringkasan`, `Laba Rugi`, `Arus Kas`, `Neraca`, `Persediaan`, `Pembelian Stok`, `Penjualan`, `Beban Operasional`, `Pembayaran`, `Rekonsiliasi`, dan `Metadata`. Angka mengikuti model yang sama dengan UI; pembayaran historis yang tidak diketahui ditandai, bukan dianggap nol.
+- Laporan arus kas menampilkan grafik perubahan bersih kas/bank per bulan dari jurnal dalam periode filter. Jurnal nonkas dikecualikan; grafik bukan saldo rekening dan tidak mengasumsikan saldo awal.
 - File memakai `xlsx-js-style` melalui CDN; ekspor membutuhkan library tersebut dan koneksi yang dapat memuatnya. Workbook memberi format judul/header, mata uang, lebar kolom, dan filter otomatis; tidak ada formula spreadsheet yang dibentuk dari input pengguna.
-- Jalankan uji fixture tanpa database melalui `tests/financial-reports.html`; fixture tidak dikirim ke Supabase. Uji meliputi perhitungan operasional, jurnal, arus kas, neraca, selisih, dan saldo awal yang hilang.
+- Jalankan uji fixture tanpa database melalui `tests/financial-reports.html`; fixture tidak dikirim ke Supabase. Uji meliputi perhitungan operasional, jurnal, arus kas, perubahan kas bulanan, neraca, selisih, dan saldo awal yang hilang.
 - QA staging yang masih wajib: uji migrasi pada Supabase staging, hak akses Owner/customer, jurnal tak seimbang, pembayaran tunai/digital dan bertahap, pembelian/beban tunai-kredit, pembayaran utang, refund, rekonsiliasi bank dan stok, serta ekspor dengan Excel. Jangan membuat transaksi uji pada data produksi.
 
 ## ERD Inti (3 Entitas)
