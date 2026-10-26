@@ -186,28 +186,45 @@ function renderDeliveryOrders(){
  $("#deliveryOrders").innerHTML=orders.length?`<table class="data-table"><thead><tr><th>NOMOR PESANAN</th><th>TANGGAL PESANAN</th><th>TANGGAL PENGIRIMAN</th><th>PELANGGAN</th><th>ITEM</th><th>ALAMAT & CATATAN</th><th>TOTAL</th><th>STATUS</th><th>AKSI</th></tr></thead><tbody>${orders.map(order=>{
   const customer=customers.find(row=>String(row.id)===String(order.pelanggan_id));
   const items=(order.items||[]).map(item=>`${esc(item.name||item.nama_barang)} × ${Number(item.qty||item.jumlah)}`).join("<br>");
-  const statusActions=order.status==="menunggu"?`<div class="delivery-actions"><button class="btn-secondary delivery-status-action" data-delivery-status="diproses" data-delivery-id="${esc(order.id)}">Sedang Diproses</button><button class="btn-secondary delivery-status-action danger" data-delivery-status="dibatalkan" data-delivery-id="${esc(order.id)}">Tolak Pesanan</button></div>`:order.status==="diproses"?`<button class="btn-secondary delivery-status-action" data-delivery-status="dalam_pengiriman" data-delivery-id="${esc(order.id)}">Dalam Pengiriman</button>`:order.status==="dalam_pengiriman"?`<div class="delivery-actions"><button class="btn-primary delivery-status-action" data-delivery-status="selesai" data-delivery-id="${esc(order.id)}"><i class="fa-solid fa-circle-check"></i> Selesaikan Pengantaran</button><button class="btn-secondary delivery-status-action danger" data-delivery-status="gagal_dikirim" data-delivery-id="${esc(order.id)}">Gagal Dikirim</button></div>`:"";
+  const statusActions=order.status==="menunggu"?`<div class="delivery-actions"><button class="btn-secondary delivery-status-action" data-delivery-status="diproses" data-delivery-id="${esc(order.id)}">Sedang Diproses</button><button class="btn-secondary delivery-status-action danger" data-delivery-status="dibatalkan" data-delivery-id="${esc(order.id)}">Tolak Pesanan</button></div>`:order.status==="diproses"?`<div class="delivery-actions"><button class="btn-secondary delivery-status-action" data-delivery-status="dalam_pengiriman" data-delivery-id="${esc(order.id)}">Dalam Pengiriman</button><button class="btn-primary delivery-status-action" data-delivery-status="selesai" data-delivery-current="diproses" data-delivery-id="${esc(order.id)}"><i class="fa-solid fa-circle-check"></i> Selesaikan Pengantaran</button></div>`:order.status==="dalam_pengiriman"?`<div class="delivery-actions"><button class="btn-primary delivery-status-action" data-delivery-status="selesai" data-delivery-current="dalam_pengiriman" data-delivery-id="${esc(order.id)}"><i class="fa-solid fa-circle-check"></i> Selesaikan Pengantaran</button><button class="btn-secondary delivery-status-action danger" data-delivery-status="gagal_dikirim" data-delivery-id="${esc(order.id)}">Gagal Dikirim</button></div>`:"";
   const actions=`<div class="delivery-actions"><button class="table-action" data-print-sale="${esc(order.id)}" title="Cetak nota"><i class="fa-solid fa-print"></i></button>${statusActions}</div>`;
   const deliveryDate=order.tanggal_pengiriman?new Date(order.tanggal_pengiriman).toLocaleString("id-ID"):"Belum dikirim";
   return `<tr><td class="bold">${esc(order.nomor_nota)}</td><td>${new Date(order.tanggal).toLocaleString("id-ID")}</td><td>${deliveryDate}</td><td>${esc(order.recipient_name||customer?.nama||"Pelanggan")}<br>${esc(order.recipient_phone||customer?.telepon||"")}</td><td>${items}</td><td>${esc(order.delivery_address||customer?.alamat||"—")}${order.delivery_note?`<br><small>${esc(order.delivery_note)}</small>`:""}</td><td class="bold">${money(order.total)}</td><td><span class="status-pill ${["dibatalkan","gagal_dikirim"].includes(order.status)?"cancelled":order.status==="selesai"?"done":"pending"}">${esc(labels[order.status]||order.status)}</span></td><td>${actions}</td></tr>`;
  }).join("")}</tbody></table>`:empty("Belum ada pesanan antar","Pesanan pelanggan yang masuk akan tampil di sini.");
 }
 async function updateDeliveryOrder(id,status){
+ await requestDeliveryStatus(id,status);
+ await loadData();
+}
+async function requestDeliveryStatus(id,status){
  const {error}=await db().rpc("update_delivery_status",{p_sale_id:id,p_status:status});
  if(error){
   const details=error.message||"Kesalahan tidak diketahui.";
-  if(["dalam_pengiriman","gagal_dikirim"].includes(status))throw new Error(`Status ini memerlukan migrasi backend/sql/07_delivery_tracking.sql. Pastikan migrasi telah diterapkan dan status pesanan masih valid. Detail: ${details}`);
+  if(["dalam_pengiriman","gagal_dikirim"].includes(status))throw new Error(`Status ini memerlukan migrasi backend/sql/07_delivery_tracking.sql dan 09_accounting_ledger.sql. Pastikan migrasi telah diterapkan dan status pesanan masih valid. Detail: ${details}`);
   throw new Error(details);
  }
- await loadData();
 }
-async function handleDeliveryAction(action,id,button){
+async function completeDeliveryOrder(id,currentStatus){
+ if(currentStatus==="diproses"){
+  await requestDeliveryStatus(id,"dalam_pengiriman");
+  try{await requestDeliveryStatus(id,"selesai")}
+  catch(error){
+   await loadData();
+   throw new Error(`Pesanan sudah dipindahkan ke Dalam Pengiriman, tetapi belum dapat diselesaikan: ${error.message}`);
+  }
+  await loadData();
+  return;
+ }
+ await updateDeliveryOrder(id,"selesai");
+}
+async function handleDeliveryAction(action,id,button,currentStatus){
  if(button)button.disabled=true;
  try{
   if(action==="dibatalkan"&&!confirm("Tolak pesanan ini dan kembalikan stok?"))return;
   if(action==="gagal_dikirim"&&!confirm("Tandai gagal dikirim dan kembalikan stok yang sudah dipesan?"))return;
   if(action==="selesai"&&!confirm("Konfirmasi barang sudah diterima pelanggan? Status pengantaran akan diselesaikan; pembayaran tetap dicatat terpisah."))return;
-  await updateDeliveryOrder(id,action);
+  if(action==="selesai")await completeDeliveryOrder(id,currentStatus);
+  else await updateDeliveryOrder(id,action);
   toast(({diproses:"Pesanan dikonfirmasi dan mulai diproses.",dalam_pengiriman:"Pesanan ditandai dalam pengiriman.",selesai:"Pengantaran selesai. Status pembayaran tidak diubah.",gagal_dikirim:"Pengiriman gagal dan stok dikembalikan.",dibatalkan:"Pesanan ditolak dan stok dikembalikan."})[action]||"Status pesanan diperbarui.");
  }catch(error){toast(error.message||"Status pesanan gagal diperbarui.",true);}
  finally{if(button)button.disabled=false}
@@ -711,7 +728,7 @@ function setup(){
  $("#applyReport").onclick=applyReportFilters;$("#resetReport").onclick=()=>{$("#reportFrom").value="";$("#reportTo").value="";applyReportFilters()};$("#salesTable").addEventListener("click",e=>{const b=e.target.closest("[data-cancel-sale]");if(b)cancelSale(b.dataset.cancelSale)});
  $("#addExpense").onclick=openExpense;$("#expenseForm").addEventListener("submit",saveExpense);$("#expensesTable").addEventListener("click",e=>{const b=e.target.closest("[data-delete-expense]");if(b)deleteExpense(b.dataset.deleteExpense)});
  $("#exportProducts").onclick=exportProducts;$("#exportProductsExcel").onclick=exportProductsExcel;$("#exportCustomers").onclick=exportCustomers;$("#exportCustomersExcel").onclick=exportCustomersExcel;$("#exportSales").onclick=()=>runReportExport(exportSales);$("#exportSalesExcel").onclick=()=>runReportExport(exportSalesExcel);
- $("#refreshDelivery").onclick=()=>loadData().catch(error=>{statusConnection(false);toast("Pesanan gagal dimuat: "+error.message,true)});$("#deliveryOrders").addEventListener("click",event=>{const button=event.target.closest("[data-delivery-status]");if(button)handleDeliveryAction(button.dataset.deliveryStatus,button.dataset.deliveryId,button)});
+ $("#refreshDelivery").onclick=()=>loadData().catch(error=>{statusConnection(false);toast("Pesanan gagal dimuat: "+error.message,true)});$("#deliveryOrders").addEventListener("click",event=>{const button=event.target.closest("[data-delivery-status]");if(button)handleDeliveryAction(button.dataset.deliveryStatus,button.dataset.deliveryId,button,button.dataset.deliveryCurrent)});
  if(window.RetailFinancialReports){
   $("#exportSales").onclick=null;
   $("#exportSalesExcel").onclick=null;
