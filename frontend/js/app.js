@@ -204,28 +204,62 @@ async function requestDeliveryStatus(id,status){
   throw new Error(details);
  }
 }
-async function completeDeliveryOrder(id,currentStatus){
- if(currentStatus==="diproses"){
-  await requestDeliveryStatus(id,"dalam_pengiriman");
-  try{await requestDeliveryStatus(id,"selesai")}
-  catch(error){
-   await loadData();
-   throw new Error(`Pesanan sudah dipindahkan ke Dalam Pengiriman, tetapi belum dapat diselesaikan: ${error.message}`);
-  }
-  await loadData();
-  return;
- }
- await updateDeliveryOrder(id,"selesai");
+function openDeliveryPayment(id){
+ const order=sales.find(sale=>String(sale.id)===String(id));
+ if(!order)throw new Error("Pesanan tidak ditemukan pada data yang sedang dimuat.");
+ $("#deliveryPaymentSaleId").value=String(order.id);
+ $("#deliveryPaymentRequestKey").value=requestKey();
+ $("#deliveryPaymentDate").value=todayISO();
+ $("#deliveryPaymentMethod").value="cash";
+ $("#deliveryPaymentError").classList.add("hidden");
+ $("#deliveryPaymentDescription").textContent=`Pesanan ${order.nomor_nota||order.id} · Total nota ${money(order.total)}. Sisa tagihan dihitung dari pembayaran yang tercatat sebelumnya.`;
+ $("#deliveryPaymentDialog").showModal();
 }
-async function handleDeliveryAction(action,id,button,currentStatus){
+async function submitDeliveryPayment(event){
+ event.preventDefault();
+ const button=event.submitter,error=$("#deliveryPaymentError");
+ if(button)button.disabled=true;
+ error.classList.add("hidden");
+ try{
+  const saleId=$("#deliveryPaymentSaleId").value;
+  const method=$("#deliveryPaymentMethod").value;
+  const date=$("#deliveryPaymentDate").value;
+  if(!saleId||!date||!["cash","transfer","qris"].includes(method))throw new Error("Pilih tanggal dan metode pembayaran yang valid.");
+  const order=sales.find(sale=>String(sale.id)===saleId);
+  if(!order)throw new Error("Pesanan tidak ditemukan. Muat ulang daftar pesanan.");
+  if(!confirm(`Konfirmasi barang pesanan ${order.nomor_nota||""} sudah diterima dan sisa pembayaran benar-benar diterima melalui ${$("#deliveryPaymentMethod").selectedOptions[0].text}? Sistem menghitung sisa tagihan dari catatan pembayaran sebelumnya dan mencatatnya ke Kas/Bank.`))return;
+  const result=await checked(db().rpc("complete_delivery_with_payment",{
+   p_sale_id:saleId,p_payment_method:method,p_payment_date:date,
+   p_request_key:$("#deliveryPaymentRequestKey").value
+  }));
+  $("#deliveryPaymentDialog").close();
+  try{await loadData()}
+  catch(refreshError){
+   statusConnection(false);
+   toast(`Pengantaran dan pembayaran sudah berhasil dicatat, tetapi daftar gagal dimuat ulang: ${refreshError.message}`,true);
+   return;
+  }
+  toast(result?.already_paid
+   ?"Pengantaran selesai; tagihan sudah lunas sebelumnya, tidak ada pembayaran ganda."
+   :result?.duplicate
+   ?"Pengantaran selesai; pembayaran sudah tercatat sebelumnya, tidak dibuat pembayaran ganda."
+   :`Pengantaran selesai dan pembayaran ${money(result?.collected_amount)} dicatat ke ${method==="cash"?"Kas":"Bank"} dengan jurnal.`);
+ }catch(err){
+  const detail=err.message||"Kesalahan tidak diketahui.";
+  error.textContent=/complete_delivery_with_payment|PGRST202|schema cache/i.test(detail)
+   ?`Fitur ini memerlukan migrasi backend/sql/12_delivery_payment_collection.sql setelah migrasi 07, 09, dan 10. Detail: ${detail}`
+   :detail;
+  error.classList.remove("hidden");
+ }finally{if(button)button.disabled=false}
+}
+async function handleDeliveryAction(action,id,button){
  if(button)button.disabled=true;
  try{
   if(action==="dibatalkan"&&!confirm("Tolak pesanan ini dan kembalikan stok?"))return;
   if(action==="gagal_dikirim"&&!confirm("Tandai gagal dikirim dan kembalikan stok yang sudah dipesan?"))return;
-  if(action==="selesai"&&!confirm("Konfirmasi barang sudah diterima pelanggan? Status pengantaran akan diselesaikan; pembayaran tetap dicatat terpisah."))return;
-  if(action==="selesai")await completeDeliveryOrder(id,currentStatus);
-  else await updateDeliveryOrder(id,action);
-  toast(({diproses:"Pesanan dikonfirmasi dan mulai diproses.",dalam_pengiriman:"Pesanan ditandai dalam pengiriman.",selesai:"Pengantaran selesai. Status pembayaran tidak diubah.",gagal_dikirim:"Pengiriman gagal dan stok dikembalikan.",dibatalkan:"Pesanan ditolak dan stok dikembalikan."})[action]||"Status pesanan diperbarui.");
+  if(action==="selesai"){openDeliveryPayment(id);return;}
+  await updateDeliveryOrder(id,action);
+  toast(({diproses:"Pesanan dikonfirmasi dan mulai diproses.",dalam_pengiriman:"Pesanan ditandai dalam pengiriman.",gagal_dikirim:"Pengiriman gagal dan stok dikembalikan.",dibatalkan:"Pesanan ditolak dan stok dikembalikan."})[action]||"Status pesanan diperbarui.");
  }catch(error){toast(error.message||"Status pesanan gagal diperbarui.",true);}
  finally{if(button)button.disabled=false}
 }
@@ -728,7 +762,7 @@ function setup(){
  $("#applyReport").onclick=applyReportFilters;$("#resetReport").onclick=()=>{$("#reportFrom").value="";$("#reportTo").value="";applyReportFilters()};$("#salesTable").addEventListener("click",e=>{const b=e.target.closest("[data-cancel-sale]");if(b)cancelSale(b.dataset.cancelSale)});
  $("#addExpense").onclick=openExpense;$("#expenseForm").addEventListener("submit",saveExpense);$("#expensesTable").addEventListener("click",e=>{const b=e.target.closest("[data-delete-expense]");if(b)deleteExpense(b.dataset.deleteExpense)});
  $("#exportProducts").onclick=exportProducts;$("#exportProductsExcel").onclick=exportProductsExcel;$("#exportCustomers").onclick=exportCustomers;$("#exportCustomersExcel").onclick=exportCustomersExcel;$("#exportSales").onclick=()=>runReportExport(exportSales);$("#exportSalesExcel").onclick=()=>runReportExport(exportSalesExcel);
- $("#refreshDelivery").onclick=()=>loadData().catch(error=>{statusConnection(false);toast("Pesanan gagal dimuat: "+error.message,true)});$("#deliveryOrders").addEventListener("click",event=>{const button=event.target.closest("[data-delivery-status]");if(button)handleDeliveryAction(button.dataset.deliveryStatus,button.dataset.deliveryId,button,button.dataset.deliveryCurrent)});
+ $("#refreshDelivery").onclick=()=>loadData().catch(error=>{statusConnection(false);toast("Pesanan gagal dimuat: "+error.message,true)});$("#deliveryOrders").addEventListener("click",event=>{const button=event.target.closest("[data-delivery-status]");if(button)handleDeliveryAction(button.dataset.deliveryStatus,button.dataset.deliveryId,button)});$("#deliveryPaymentForm").addEventListener("submit",submitDeliveryPayment);
  if(window.RetailFinancialReports){
   $("#exportSales").onclick=null;
   $("#exportSalesExcel").onclick=null;
