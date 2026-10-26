@@ -227,7 +227,6 @@ async function submitDeliveryPayment(event){
   if(!saleId||!date||!["cash","transfer","qris"].includes(method))throw new Error("Pilih tanggal dan metode pembayaran yang valid.");
   const order=sales.find(sale=>String(sale.id)===saleId);
   if(!order)throw new Error("Pesanan tidak ditemukan. Muat ulang daftar pesanan.");
-  if(!confirm(`Konfirmasi barang pesanan ${order.nomor_nota||""} sudah diterima dan sisa pembayaran benar-benar diterima melalui ${$("#deliveryPaymentMethod").selectedOptions[0].text}? Sistem menghitung sisa tagihan dari catatan pembayaran sebelumnya dan mencatatnya ke Kas/Bank.`))return;
   const result=await checked(db().rpc("complete_delivery_with_payment",{
    p_sale_id:saleId,p_payment_method:method,p_payment_date:date,
    p_request_key:$("#deliveryPaymentRequestKey").value
