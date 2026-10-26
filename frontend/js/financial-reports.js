@@ -219,6 +219,17 @@
     const lines = accounting.lines || [];
     const payments = accounting.payments || [];
     const reconciliations = accounting.reconciliations || [];
+    const endDate = period.to || dateInStoreZone(new Date());
+    const cutoverDate = accounting.settings.cutover_date;
+    if (endDate < cutoverDate) {
+      return {
+        error: `Laporan jurnal belum tersedia untuk periode sebelum cutover ${cutoverDate}. Transaksi historis tidak direkonstruksi.`,
+        unavailableBeforeCutover: true,
+        cutoverDate,
+        startDate: period.from || "",
+        endDate
+      };
+    }
     const accountById = new Map(accounts.map(account => [String(account.id), account]));
     const entryById = new Map(entries.map(entry => [String(entry.id), entry]));
     const linesByEntry = new Map();
@@ -229,8 +240,6 @@
       linesByEntry.set(entryId, [...(linesByEntry.get(entryId) || []), line]);
       linesByAccount.set(accountId, [...(linesByAccount.get(accountId) || []), line]);
     }
-    const endDate = period.to || dateInStoreZone(new Date());
-    const cutoverDate = accounting.settings.cutover_date;
     const startDate = period.from && period.from > cutoverDate ? period.from : cutoverDate;
     const entryAtEnd = entries.filter(entry => entry.entry_date <= endDate);
     const entryInPeriod = entryAtEnd.filter(entry => entry.entry_date >= startDate);
@@ -493,7 +502,7 @@
     setText("#reportCanceledCount", String(model.cancelledCount));
     if (saleCount) saleCount.textContent = String(model.completed.length);
     setText("#reportCashflow", model.accounting.error
-      ? "Migrasi belum dijalankan"
+      ? model.accounting.unavailableBeforeCutover ? "Data historis belum tersedia" : "Ledger belum tersedia"
       : model.accounting.hasOpening ? currency(model.accounting.netCashChange) : "Saldo awal belum dicatat");
     setText("#reportPurchases", currency(sum(model.purchases, row => Number(row.total ?? Number(row.jumlah || 0) * Number(row.harga_satuan || 0)))));
 
@@ -532,7 +541,9 @@
     "Belum ada transaksi pada periode ini");
     const incomeHeading = document.querySelector("#incomeStatement")?.closest(".panel")?.querySelector(".panel-head p");
     if (incomeHeading) incomeHeading.textContent = accounting.error
-      ? "Ringkasan operasional provisional; jalankan migrasi ledger untuk laporan laba rugi jurnal."
+      ? accounting.unavailableBeforeCutover
+        ? `Ringkasan operasional provisional. Jurnal sebelum cutover ${accounting.cutoverDate} tidak tersedia dan tidak direkonstruksi.`
+        : "Ringkasan operasional provisional; jalankan migrasi ledger untuk laporan laba rugi jurnal."
       : `Berdasarkan jurnal yang diposting ${accounting.startDate} s.d. ${accounting.endDate}. Data sebelum ${accounting.cutoverDate} tidak direkonstruksi.`;
 
     const paymentNode = document.querySelector("#paymentBreakdown");
@@ -593,7 +604,7 @@
     }
     const cashWarning = document.querySelector("#cashFlowStatementWarning");
     if (cashWarning) {
-      cashWarning.classList.toggle("hidden", Boolean(accounting.error));
+      cashWarning.classList.toggle("hidden", false);
       cashWarning.textContent = accounting.error || (accounting.hasOpening
         ? "QRIS dan kartu debit dicatat ke Bank pada tanggal transaksi sesuai kebijakan yang dipilih. Saldo awal perlu diverifikasi; saldo akhir yang dilaporkan adalah saldo buku, bukan rekening koran."
         : "Arus transaksi tercatat ditampilkan, tetapi saldo awal dan saldo akhir tidak tersedia sampai Owner memasukkan saldo awal terverifikasi. Tidak ada transaksi lama yang ditebak.");
@@ -1035,7 +1046,7 @@
     const ledgerPnl = ledger
       ? [...ledger.profitAndLossRows.map(row => [row.code, row.name, row.amount]),
         ["", "Laba/rugi bersih jurnal pada periode", sum(ledger.profitAndLossRows, row => row.amount)]]
-      : [["", "Migrasi ledger belum diterapkan", "Tidak tersedia"]];
+      : [["", model.accounting.error, "Tidak tersedia"]];
     const cashFlowRows = ledger ? [
       ["Saldo kas/bank awal", ledger.openingCash ?? "Saldo awal belum tersedia", "", ""],
       ...ledger.activityRows.map(row => [
@@ -1045,7 +1056,7 @@
       ["Perubahan kas/bank", "", "", ledger.netCashChange],
       ["Saldo kas/bank akhir", ledger.cashEnding ?? "Saldo awal belum tersedia", "", ""],
       ...ledger.cashByMethod.map(row => [`Metode: ${paymentLabel(row.method)}`, row.inflow, row.outflow, row.inflow-row.outflow])
-    ] : [["", "Migrasi ledger belum diterapkan", "Tidak tersedia", "Tidak tersedia"]];
+    ] : [["", model.accounting.error, "Tidak tersedia", "Tidak tersedia"]];
     const balanceSheetRows = ledger ? [
       ...ledger.assets.map(row => ["Aset", row.code, row.name, row.amount]),
       ["", "", "TOTAL ASET", ledger.assetTotal],
@@ -1055,7 +1066,7 @@
       ["Ekuitas", "", "Laba/rugi kumulatif setelah cutover", ledger.profitToDate],
       ["", "", "TOTAL LIABILITAS + EKUITAS", ledger.liabilityTotal+ledger.equityTotal],
       ["", "", "SELISIH NERACA", ledger.balanceDifference]
-    ] : [["", "", "Migrasi ledger belum diterapkan", "Tidak tersedia"]];
+    ] : [["", "", model.accounting.error, "Tidak tersedia"]];
     const reconciliationRows = ledger ? [
       ["Saldo awal", ledger.hasOpening ? "Tersedia" : "Belum dicatat"],
       ["Keseimbangan jurnal", ledger.allBalanced ? "Seimbang" : "TIDAK SEIMBANG"],

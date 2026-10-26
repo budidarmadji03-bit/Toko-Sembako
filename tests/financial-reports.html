@@ -197,6 +197,13 @@
         equal(model.openingCash, null);
         equal(model.cashEnding, null);
       });
+      run("periode yang seluruhnya sebelum cutover tidak ditampilkan sebagai saldo nol", () => {
+        const model = api.makeAccountingModel(accountingSource, { from: "2026-10-19", to: "2026-10-25" });
+        equal(model.unavailableBeforeCutover, true);
+        equal(model.cutoverDate, "2026-10-26");
+        equal(model.balanceDifference, undefined);
+        equal(model.cashEnding, undefined);
+      });
       run("grafik perubahan kas bulanan memakai jurnal aktual dan mengabaikan jurnal nonkas", () => {
         const altered = {
           ...accountingFixture,
